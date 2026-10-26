@@ -3,11 +3,9 @@
 #include <Adafruit_BME280.h>
 #include <DomoCore.h>
 
-#define DEVICE_ID "esp32-salon"
-#define ROOM      "salon"
 #define SEND_INTERVAL_MS 30000
 
-DomoCore core(DEVICE_ID, ROOM);
+DomoCore core("climate");
 Adafruit_BME280 bme;
 bool bmeOk = false;
 unsigned long lastSend = 0;

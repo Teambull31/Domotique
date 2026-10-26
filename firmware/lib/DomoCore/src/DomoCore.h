@@ -6,40 +6,49 @@
 #include <functional>
 #include <vector>
 
-// Socle commun des nœuds : WiFi, MQTT (LWT), OTA, auto-découverte Home Assistant.
-// Topics : home/devices/<id>/{telemetry,status,command} (compatible dashboard existant)
+// Socle commun des nœuds : portail de configuration (WiFi/MQTT/pièce saisis au 1er démarrage,
+// stockés en flash), MQTT avec LWT, OTA, auto-découverte Home Assistant.
+// Topics : home/devices/<nœud>-<pièce>/{telemetry,status,command}
 class DomoCore {
 public:
   using CommandHandler = std::function<void(JsonDocument&)>;
 
-  DomoCore(const char* deviceId, const char* room);
+  explicit DomoCore(const char* nodeType);
 
+  // Bloquant au 1er démarrage (portail "Domo-<nœud>-setup"). Maintenir BOOT (GPIO0)
+  // 3 s au démarrage efface la configuration.
   void begin();
   void loop();
 
-  // Déclare une entité dans Home Assistant (MQTT discovery).
-  // component: "sensor" | "binary_sensor" | "switch" | "light" ...
-  // key: clé JSON dans la télémétrie. deviceClass/unit peuvent être nullptr.
+  // Déclare une entité Home Assistant (MQTT discovery), à appeler avant begin().
+  // component : sensor | binary_sensor | switch | number | cover
+  // key : clé JSON dans la télémétrie (et dans les commandes pour switch/number/cover).
+  // extraJson : champs de discovery additionnels, ex. {"min":7,"max":25,"step":0.5}
   void addEntity(const char* component, const char* key, const char* name,
-                 const char* deviceClass = nullptr, const char* unit = nullptr);
+                 const char* deviceClass = nullptr, const char* unit = nullptr,
+                 const char* extraJson = nullptr);
 
   void onCommand(CommandHandler h) { _handler = h; }
   bool publishTelemetry(JsonDocument& doc);
   bool connected() { return _mqtt.connected(); }
+  // Pour nœuds sur pile : attendre la connexion MQTT, puis laisser partir les paquets.
+  bool waitConnected(uint32_t timeoutMs);
+  void flush(uint32_t ms = 300);
+  const String& room() const { return _room; }
 
 private:
-  void connectWiFi();
   bool connectMQTT();
-  void handleMessage(char* topic, byte* payload, unsigned int len);
+  void handleMessage(byte* payload, unsigned int len);
   void publishDiscovery();
 
-  const char* _id;
-  const char* _room;
+  String _nodeType, _id, _room = "maison";
+  String _host, _user, _pass, _ota = "changeme";
+  uint16_t _port = 1883;
   String _tTelemetry, _tStatus, _tCommand;
   WiFiClient _wifi;
   PubSubClient _mqtt;
   CommandHandler _handler;
   unsigned long _lastTry = 0;
-  struct Entity { String component, key, name, deviceClass, unit; };
+  struct Entity { String component, key, name, deviceClass, unit, extra; };
   std::vector<Entity> _entities;
 };

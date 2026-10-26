@@ -1,0 +1,107 @@
+# Package Home Assistant "tranquillité" pour personnes âgées.
+# Copier dans /config/packages/ (homeassistant: packages: !include_dir_named packages).
+# ADAPTER les entity_id (voir Paramètres > Appareils) et notify.mobile_app_* (téléphone du proche).
+# Principe : aucune action demandée à la personne âgée ; seul le proche aidant est notifié.
+
+input_number:
+  senior_inactivity_hours:
+    name: Alerte si aucune présence détectée (heures)
+    min: 2
+    max: 24
+    step: 1
+    initial: 8
+input_boolean:
+  senior_alerts_enabled:
+    name: Alertes tranquillité actives
+    initial: true
+
+template:
+  - trigger:
+      - platform: time_pattern
+        minutes: "/10"
+      - platform: state
+        entity_id:
+          - binary_sensor.presence_salon_presence
+          - binary_sensor.presence_chambre_presence
+          - binary_sensor.presence_cuisine_presence
+    binary_sensor:
+      - name: "Activité récente à la maison"
+        # vrai si une pièce est occupée, ou l'a été dans la fenêtre choisie.
+        # (après un redémarrage de HA, last_changed repart de zéro : pas de fausse alerte)
+        state: >
+          {% set h = states('input_number.senior_inactivity_hours') | float(8) %}
+          {% set rooms = ['binary_sensor.presence_salon_presence',
+                          'binary_sensor.presence_chambre_presence',
+                          'binary_sensor.presence_cuisine_presence'] %}
+          {% set ns = namespace(active=false) %}
+          {% for r in rooms if states[r] is not none %}
+            {% if is_state(r, 'on') or (now() - states[r].last_changed).total_seconds() < h * 3600 %}
+              {% set ns.active = true %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.active }}
+
+automation:
+  - alias: "Senior - aucune activité pendant la journée"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.activite_recente_a_la_maison
+        to: "off"
+    condition:
+      - condition: state
+        entity_id: input_boolean.senior_alerts_enabled
+        state: "on"
+      - condition: time
+        after: "09:00:00"
+        before: "21:00:00"
+    action:
+      - service: notify.mobile_app_proche
+        data:
+          title: "Pas d'activité détectée"
+          message: "Aucune présence détectée à la maison depuis un moment. Un appel serait bienvenu."
+          data: { ttl: 0, priority: high }
+
+  - alias: "Senior - porte d'entrée ouverte la nuit"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.door_entree_ouverture
+        to: "on"
+    condition:
+      - condition: time
+        after: "22:30:00"
+        before: "06:00:00"
+    action:
+      - service: notify.mobile_app_proche
+        data: { title: "Porte d'entrée ouverte", message: "La porte d'entrée vient de s'ouvrir en pleine nuit.", data: { priority: high } }
+
+  - alias: "Senior - fuite d'eau"
+    trigger:
+      - platform: state
+        entity_id: [binary_sensor.leak_cuisine_fuite, binary_sensor.leak_salle_de_bain_fuite]
+        to: "on"
+    action:
+      - service: notify.mobile_app_proche
+        data: { title: "Fuite d'eau", message: "{{ trigger.to_state.name }} : de l'eau détectée.", data: { priority: high, ttl: 0 } }
+
+  - alias: "Senior - CO2 élevé, aérer"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.air_chambre_co2
+        above: 1500
+        for: "00:15:00"
+    action:
+      - service: notify.mobile_app_proche
+        data: { title: "Air confiné", message: "CO2 élevé dans la chambre (> 1500 ppm)." }
+
+  - alias: "Senior - capteur sur pile muet ou batterie faible"
+    trigger:
+      - platform: numeric_state
+        entity_id: [sensor.door_entree_batterie, sensor.leak_cuisine_batterie]
+        below: 20
+      - platform: state
+        entity_id: [binary_sensor.door_entree_ouverture, binary_sensor.leak_cuisine_fuite]
+        to: unavailable
+        for: "03:00:00"
+    action:
+      - service: notify.mobile_app_proche
+        data: { title: "Capteur à vérifier", message: "{{ trigger.to_state.name }} : batterie faible ou hors ligne." }
