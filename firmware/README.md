@@ -15,7 +15,7 @@
 1. `pip install platformio`
 2. `cd firmware && pio run -e <nœud> -t upload` (1er flash en USB, ensuite OTA possible).
 3. Au premier démarrage, se connecter au WiFi `Domo-<nœud>-setup` et renseigner : WiFi, IP du broker MQTT
-   (Home Assistant), pièce, mot de passe OTA. BOOT maintenu 3 s au démarrage = réinitialisation.
+   (Home Assistant), pièce, mot de passe OTA (8 caractères minimum ; vide = mise à jour WiFi désactivée, reflash en USB). BOOT maintenu 3 s au démarrage = réinitialisation.
 4. Dans HA : intégration **MQTT** activée -> les entités apparaissent seules, rangées par pièce.
 
 Brochages dans l'en-tête de chaque `nodes/<nœud>/main.cpp`. Les 8 nœuds compilent avec PlatformIO ;

@@ -42,7 +42,8 @@ private:
   void publishDiscovery();
 
   String _nodeType, _id, _room = "maison";
-  String _host, _user, _pass, _ota = "changeme";
+  String _host, _user, _pass, _ota;
+  bool _otaOn = false;
   uint16_t _port = 1883;
   String _tTelemetry, _tStatus, _tCommand;
   WiFiClient _wifi;

@@ -31,7 +31,7 @@ void DomoCore::begin() {
   _port = prefs.getUShort("port", 1883);
   _user = prefs.getString("user", "");
   _pass = prefs.getString("pass", "");
-  _ota  = prefs.getString("ota", "changeme");
+  _ota  = prefs.getString("ota", "");
 
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
@@ -42,7 +42,7 @@ void DomoCore::begin() {
   WiFiManagerParameter pPort("port", "Port MQTT", portBuf, 6);
   WiFiManagerParameter pUser("user", "Utilisateur MQTT", _user.c_str(), 32);
   WiFiManagerParameter pPass("pass", "Mot de passe MQTT", _pass.c_str(), 64);
-  WiFiManagerParameter pOta("ota", "Mot de passe mise à jour (OTA)", _ota.c_str(), 32);
+  WiFiManagerParameter pOta("ota", "Mot de passe OTA (vide = mise à jour WiFi désactivée)", _ota.c_str(), 32);
   for (auto* p : {&pRoom, &pHost, &pPort, &pUser, &pPass, &pOta}) wm.addParameter(p);
   bool save = false;
   wm.setSaveParamsCallback([&] { save = true; });
@@ -69,12 +69,16 @@ void DomoCore::begin() {
 
   WiFi.setHostname(_id.c_str());
   WiFi.setAutoReconnect(true);
-  ArduinoOTA.setHostname(_id.c_str());
-  ArduinoOTA.setPassword(_ota.c_str());
-  ArduinoOTA.begin();
+  // OTA uniquement si un mot de passe est défini : jamais de mise à jour WiFi ouverte.
+  if (_ota.length() >= 8) {
+    ArduinoOTA.setHostname(_id.c_str());
+    ArduinoOTA.setPassword(_ota.c_str());
+    ArduinoOTA.begin();
+    _otaOn = true;
+  }
 
   _mqtt.setServer(_host.c_str(), _port);
-  _mqtt.setBufferSize(1024);
+  _mqtt.setBufferSize(1536);
   _mqtt.setKeepAlive(30);
   _mqtt.setCallback([this](char*, byte* p, unsigned int l) { handleMessage(p, l); });
 }
@@ -94,7 +98,7 @@ bool DomoCore::connectMQTT() {
 }
 
 void DomoCore::loop() {
-  ArduinoOTA.handle();
+  if (_otaOn) ArduinoOTA.handle();
   if (WiFi.status() != WL_CONNECTED) return;  // la reconnexion WiFi est automatique
   if (!_mqtt.connected()) {
     if (millis() - _lastTry < 5000) return;  // essai MQTT toutes les 5 s, sans bloquer

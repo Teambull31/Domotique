@@ -1,0 +1,24 @@
+name: firmware
+on:
+  push:
+    paths: ['firmware/**', '.github/workflows/firmware.yml']
+  pull_request:
+    paths: ['firmware/**']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [climate, air, power, door, leak, presence, shutters, heating]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('firmware/platformio.ini') }}
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install platformio
+      - run: pio run -e ${{ matrix.node }}
+        working-directory: firmware

@@ -52,7 +52,7 @@ void loop() {
     temp = bme.readTemperature();
   }
 
-  // Sécurité : capteur muet -> on coupe (sauf rien à faire en l'absence de mesure)
+  // Sécurité : sans mesure valide (capteur muet) le relais est coupé
   float target = enabled ? setpoint : FROST_C;
   bool want = heating;
   if (isnan(temp)) want = false;

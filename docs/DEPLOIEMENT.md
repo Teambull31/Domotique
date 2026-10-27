@@ -9,7 +9,8 @@
 - **Tout est configuré sur place, sans recompiler** : à la première mise sous tension, un nœud ouvre un
   WiFi `Domo-<nœud>-setup` (portail captif) où on saisit WiFi, IP du broker MQTT, pièce, mot de passe OTA.
   BOOT maintenu 3 s au démarrage = remise à zéro.
-- Les mises à jour se font par WiFi (OTA), sans rien démonter.
+- Les mises à jour se font par WiFi (OTA) si un mot de passe de 8+ caractères a été saisi ; sinon OTA désactivée.
+- **Broker MQTT du site : toujours avec utilisateur/mot de passe** (jamais `allow_anonymous true` hors réseau de test).
 
 ## Kit « premier site » (mon père / grands-parents)
 | Besoin | Nœud | Pièces |
