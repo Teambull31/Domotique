@@ -2,6 +2,9 @@
 #include <ArduinoOTA.h>
 #include <Preferences.h>
 #include <WiFiManager.h>
+#include <esp_task_wdt.h>
+
+#define WDT_TIMEOUT_S 60  // boucle bloquée plus de 60 s (bus I2C figé...) -> redémarrage
 
 DomoCore::DomoCore(const char* nodeType) : _nodeType(nodeType), _mqtt(_wifi) {}
 
@@ -92,8 +95,16 @@ void DomoCore::begin() {
   if (_ota.length() >= 8) {
     ArduinoOTA.setHostname(_id.c_str());
     ArduinoOTA.setPassword(_ota.c_str());
+    ArduinoOTA.onProgress([](unsigned, unsigned) { esp_task_wdt_reset(); });
     ArduinoOTA.begin();
     _otaOn = true;
+  }
+
+  // Chien de garde matériel pour les nœuds secteur : un relais (chauffage, volet) ne doit
+  // jamais rester figé sur un programme planté. Armé après le portail (qui bloque 5 min).
+  if (!_sleepySec) {
+    esp_task_wdt_init(WDT_TIMEOUT_S, true);
+    esp_task_wdt_add(NULL);
   }
 
   _mqtt.setServer(_host.c_str(), _port);
@@ -119,6 +130,7 @@ bool DomoCore::connectMQTT() {
 }
 
 void DomoCore::loop() {
+  if (!_sleepySec) esp_task_wdt_reset();
   if (_otaOn) ArduinoOTA.handle();
   if (WiFi.status() != WL_CONNECTED) return;  // la reconnexion WiFi est automatique
   if (!_mqtt.connected()) {
