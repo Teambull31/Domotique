@@ -5,11 +5,11 @@
 | `climate` | BME280 | température, humidité, pression |
 | `air` | SCD40 + PMS5003 | CO2, particules |
 | `power` | PZEM-004T v3 | tension, courant, puissance, énergie (kWh) |
-| `door` | contact reed, pile | ouverture porte/fenêtre (deep sleep) |
-| `leak` | sonde d'eau, pile | fuite (deep sleep) |
-| `presence` | LD2410 + relais | présence (même immobile) + lumière auto locale |
-| `shutters` | 2 relais | volet roulant (open/close/stop, interverrouillé) |
-| `heating` | BME280 + relais | thermostat local avec hors-gel |
+| `door` | contact reed, pile | ouverture porte/fenêtre (deep sleep, ouverture brève non perdue) |
+| `leak` | sonde d'eau, pile | fuite (deep sleep, confirmée sur 2 lectures) |
+| `presence` | LD2410 + relais | présence (même immobile) + lumière auto locale ; un forçage depuis HA est respecté tant que la pièce est occupée |
+| `shutters` | 2 relais | volet roulant interverrouillé, position 0-100 % estimée et mémorisée |
+| `heating` | BME280 + relais | thermostat local, hors-gel, détection de fenêtre ouverte, coupure si capteur muet |
 
 ## Cartes prises en charge
 Chaque nœud existe pour 3 cartes : `<nœud>` (ESP32-DevKitC), `<nœud>-c3` (ESP32-C3-DevKitM/C), `<nœud>-s3` (ESP32-S3-DevKitC-1).
@@ -36,6 +36,14 @@ le DevKitC pour `air`, `presence` et `shutters`.
 3. Au premier démarrage, se connecter au WiFi `Domo-<nœud>-setup` et renseigner : WiFi, IP du broker MQTT
    (Home Assistant), pièce, mot de passe OTA (8 caractères minimum ; vide = mise à jour WiFi désactivée, reflash en USB). BOOT maintenu 3 s au démarrage = réinitialisation.
 4. Dans HA : intégration **MQTT** activée -> les entités apparaissent seules, rangées par pièce.
+
+## Robustesse (socle DomoCore, v0.3.0)
+- **Nœuds secteur** : chien de garde matériel (boucle bloquée 60 s -> redémarrage), redémarrage après
+  15 min sans MQTT, LWT `offline`, diagnostic dans HA (signal WiFi, durée de fonctionnement), version du
+  firmware dans la fiche appareil, entités redéclarées quand Home Assistant redémarre.
+- **Nœuds sur pile** (`setSleepy`) : pas de LWT mais `expire_after` (indisponible après 2 réveils manqués),
+  dernier état retenu sur le broker, jamais de portail ni de redémarrage en boucle si le WiFi manque.
+- Les automatismes critiques (hors-gel, lumière auto, arrêt des volets) tournent en local, sans HA ni WiFi.
 
 Les 8 nœuds compilent pour les 3 cartes (24 environnements) ;
 ils n'ont pas encore été testés sur du vrai matériel.

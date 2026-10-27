@@ -2,7 +2,7 @@
 
 ## Principe : une installation = un site autonome
 ```
-[capteurs ESP32] --WiFi/MQTT--> [Home Assistant du site] --> notifications au proche aidant
+[capteurs ESP32 / C3 / S3] --WiFi/MQTT--> [Home Assistant du site] --> notifications au proche aidant
 ```
 - **Un Home Assistant par site** (HA Green, ou Raspberry Pi 4/5 + SSD). Pas de cloud obligatoire : ça marche si Internet tombe.
 - **Accès à distance pour toi** (support) : Tailscale ou Nabu Casa, avec l'accord de la personne.
