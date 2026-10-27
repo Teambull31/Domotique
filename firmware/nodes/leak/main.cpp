@@ -14,12 +14,17 @@ DomoCore core("leak");
 void setup() {
   Serial.begin(115200);
   pinMode(PROBE_PIN, INPUT);
+  // Confirmation : humide sur 2 lectures à 300 ms d'écart (goutte de condensation, parasite)
+  int level = digitalRead(PROBE_PIN);
+  if (level == HIGH) {
+    delay(300);
+    level = digitalRead(PROBE_PIN);
+  }
   core.addEntity("binary_sensor", "wet", "Fuite", "moisture");
   core.addEntity("sensor", "battery", "Batterie", "battery", "%");
   core.setSleepy(HEARTBEAT_SEC);
   core.begin();
 
-  int level = digitalRead(PROBE_PIN);
   JsonDocument doc;
   doc["wet"] = (level == HIGH);
   doc["battery"] = roundf(domoBatteryPercent(BATTERY_ADC));
