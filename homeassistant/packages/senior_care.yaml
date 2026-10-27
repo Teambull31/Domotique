@@ -100,6 +100,7 @@ template:
         from: "on"
       - platform: state
         entity_id: binary_sensor.door_entree_ouverture
+        from: "off"  # vraie ouverture (pas un retour d'"indisponible" porte déjà ouverte)
         to: "on"
     sensor:
       - name: "Dernière activité à la maison"
@@ -203,6 +204,9 @@ automation:
     trigger:
       - platform: state
         entity_id: binary_sensor.door_entree_ouverture
+        # vraie ouverture : capteur sur pile revenu d'"indisponible" (ou HA redémarré) alors que la
+        # porte était déjà ouverte = pas d'alerte "vient de s'ouvrir"
+        from: "off"
         to: "on"
     condition:
       - condition: time
