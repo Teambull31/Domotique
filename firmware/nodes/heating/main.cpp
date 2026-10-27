@@ -1,6 +1,7 @@
 // Nœud "heating" : thermostat d'une pièce (BME280 + contact sec de relais vers l'entrée thermostat
 // de la chaudière / vanne / convecteur). Hystérésis locale : fonctionne sans Home Assistant.
 // Hors-gel (7 °C) toujours actif, même si le chauffage est désactivé.
+// Fenêtre ouverte : chute de 1 °C en 5 min -> chauffe suspendue 30 min (hors-gel maintenu).
 #include <Adafruit_BME280.h>
 #include <DomoCore.h>
 #include <Preferences.h>
@@ -9,13 +10,18 @@
 #define HYSTERESIS 0.3f
 #define FROST_C 7.0f
 #define SEND_INTERVAL_MS 30000
+#define WINDOW_DROP_C 1.0f
+#define WINDOW_PAUSE_MS (30UL * 60UL * 1000UL)
 
 DomoCore core("heating");
 Adafruit_BME280 bme;
 Preferences prefs;
 bool bmeOk = false, enabled = true, heating = false, dirty = true;
 float setpoint = 19.0f, temp = NAN;
-unsigned long lastSend = 0, lastValid = 0;
+unsigned long lastSend = 0, lastValid = 0, windowSince = 0;
+bool windowOpen = false;
+float history[6];  // une mesure par minute sur 5 min
+int histCount = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -34,6 +40,7 @@ void setup() {
                  "{\"min\":10,\"max\":25,\"step\":0.5}");
   core.addEntity("switch", "enabled", "Chauffage actif");
   core.addEntity("binary_sensor", "heating", "En chauffe", "heat");
+  core.addEntity("binary_sensor", "window", "Fenêtre ouverte détectée", "window");
   core.onCommand([](JsonDocument& d) {
     if (d["setpoint"].is<float>()) {
       setpoint = constrain((float)d["setpoint"], 10.0f, 25.0f);
@@ -57,8 +64,26 @@ void loop() {
   // Plus de mesure valide depuis 2 min : on considère le capteur muet.
   if (!isnan(temp) && millis() - lastValid > 120000UL) temp = NAN;
 
+  static unsigned long lastHist = 0;
+  if (!isnan(temp) && millis() - lastHist >= 60000UL) {
+    lastHist = millis();
+    for (int i = 5; i > 0; i--) history[i] = history[i - 1];
+    history[0] = temp;
+    if (histCount < 6) histCount++;
+    if (!windowOpen && histCount == 6 && history[5] - temp >= WINDOW_DROP_C) {
+      windowOpen = true;
+      windowSince = millis();
+      dirty = true;
+    }
+  }
+  if (windowOpen && millis() - windowSince >= WINDOW_PAUSE_MS) {
+    windowOpen = false;
+    histCount = 0;  // repartir d'un historique propre (la pièce remonte en température)
+    dirty = true;
+  }
+
   // Sécurité : sans mesure valide (capteur muet) le relais est coupé
-  float target = enabled ? setpoint : FROST_C;
+  float target = (enabled && !windowOpen) ? setpoint : FROST_C;
   bool want = heating;
   if (isnan(temp)) want = false;
   else if (temp < target - HYSTERESIS) want = true;
@@ -76,6 +101,7 @@ void loop() {
     doc["setpoint"] = setpoint;
     doc["enabled"] = enabled;
     doc["heating"] = heating;
+    doc["window"] = windowOpen;
     if (core.publishTelemetry(doc)) { lastSend = millis(); dirty = false; }
   }
 }
