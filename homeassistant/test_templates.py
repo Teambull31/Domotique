@@ -104,6 +104,17 @@ async def main() -> int:
     c.states({t[0]: "unavailable", t[1]: "16"})
     c.check("froid : 16 °C déclenche, capteur indisponible ignoré", trigger_template(temps, "froid"), True)
 
+    # --- Bilan quotidien ---
+    report = automation("Senior - bilan quotidien")["action"][0]["data"]["message"]
+    c.states({"sensor.presence_detectee_aujourd_hui": "6.5", "sensor.ouvertures_de_la_porte_aujourd_hui": "3",
+              "sensor.derniere_activite_a_la_maison": (now - timedelta(minutes=5)).isoformat(),
+              "input_boolean.senior_alerts_enabled": "on", t[0]: "20.5", t[1]: "unavailable"})
+    c.check("bilan : durée de présence en h/min", report, "6 h 30")
+    c.check("bilan : nombre d'ouvertures de porte", report, "ouverte 3 fois")
+    c.check("bilan : température disponible citée", report, "20.5 °C")
+    c.states({"sensor.presence_detectee_aujourd_hui": "unknown", "sensor.derniere_activite_a_la_maison": "unknown"})
+    c.check("bilan : sans données, pas d'erreur", report, "Dernière activité : inconnue")
+
     await hass.async_stop(force=True)
     print("TOUS OK" if not c.failures else f"{c.failures} ÉCHEC(S)")
     return 1 if c.failures else 0

@@ -19,6 +19,28 @@ input_boolean:
   senior_alerts_enabled:
     name: Alertes tranquillité actives
     initial: true
+  senior_daily_report:
+    name: Bilan quotidien du soir
+    initial: true
+
+# Bilan de la journée (remis à zéro à minuit)
+sensor:
+  - platform: history_stats
+    name: Présence détectée aujourd'hui
+    unique_id: senior_presence_aujourdhui
+    entity_id: group.senior_presence
+    state: "on"
+    type: time
+    start: "{{ today_at() }}"
+    end: "{{ now() }}"
+  - platform: history_stats
+    name: Ouvertures de la porte aujourd'hui
+    unique_id: senior_ouvertures_aujourdhui
+    entity_id: binary_sensor.door_entree_ouverture
+    state: "on"
+    type: count
+    start: "{{ today_at() }}"
+    end: "{{ now() }}"
 
 group:
   senior_presence:
@@ -302,3 +324,29 @@ automation:
           title: "Porte d'entrée ouverte depuis 15 min"
           message: "Oubli, ou départ sans refermer ? Un appel peut lever le doute."
           data: { ttl: 0, priority: high }
+
+  # Les jours sans alerte aussi, le proche sait que tout va bien (et que le système fonctionne).
+  - alias: "Senior - bilan quotidien"
+    trigger:
+      - platform: time
+        at: "20:00:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.senior_daily_report
+        state: "on"
+    action:
+      - service: notify.mobile_app_proche
+        data:
+          title: "Bilan de la journée"
+          message: >
+            {% set h = states('sensor.presence_detectee_aujourd_hui') | float(0) %}
+            {% set last = states('sensor.derniere_activite_a_la_maison') | as_datetime %}
+            Présence détectée : {{ (h | int) }} h {{ '%02d' % ((h % 1) * 60) | int }}.
+            Porte d'entrée ouverte {{ states('sensor.ouvertures_de_la_porte_aujourd_hui') | int(0) }} fois.
+            Dernière activité : {{ as_local(last).strftime('%H:%M') if last else 'inconnue' }}.
+            {% set ns = namespace(l=[]) %}
+            {% for e in expand('group.senior_temperatures') if e.state | is_number %}
+              {% set ns.l = ns.l + [e.name ~ ' ' ~ e.state ~ ' °C'] %}
+            {% endfor %}
+            {{ ('Températures : ' ~ ns.l | join(', ') ~ '.') if ns.l else '' }}
+            {{ 'Alertes désactivées.' if is_state('input_boolean.senior_alerts_enabled', 'off') else '' }}
