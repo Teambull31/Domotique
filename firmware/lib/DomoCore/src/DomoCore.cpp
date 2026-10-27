@@ -13,6 +13,9 @@
 // Connexion directe au réveil suivant, sans recherche sur tous les canaux (étape la plus longue).
 RTC_DATA_ATTR static int32_t rtcChannel = 0;
 RTC_DATA_ATTR static uint8_t rtcBssid[6];
+// Réveils depuis la dernière publication de la discovery (retenue sur le broker : inutile de la
+// renvoyer à chaque réveil, ~1 ko d'émission radio en moins)
+RTC_DATA_ATTR static uint32_t rtcWakesSinceDiscovery = 0;
 
 // Reconnexion rapide d'un nœud sur pile avec le canal/BSSID mémorisés ; false -> chemin normal.
 static bool fastReconnect() {
@@ -188,7 +191,15 @@ bool DomoCore::connectMQTT() {
   _mqtt.publish(_tStatus.c_str(), "online", true);
   _mqtt.subscribe(_tCommand.c_str());
   if (!_sleepySec) _mqtt.subscribe("homeassistant/status");
-  publishDiscovery();
+  // Nœud sur pile : discovery au démarrage (mise sous tension, nouvelle configuration) puis environ
+  // une fois par jour (24 réveils), au cas où le broker aurait perdu ses messages retenus.
+  bool wake = esp_reset_reason() == ESP_RST_DEEPSLEEP;
+  if (!_sleepySec || !wake || rtcWakesSinceDiscovery >= 24) {
+    publishDiscovery();
+    rtcWakesSinceDiscovery = 0;
+  } else {
+    rtcWakesSinceDiscovery++;
+  }
   return true;
 }
 
