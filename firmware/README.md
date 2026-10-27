@@ -46,6 +46,8 @@ le DevKitC pour `air`, `presence` et `shutters`.
   firmware dans la fiche appareil, bouton « Redémarrer », entités redéclarées quand Home Assistant redémarre.
 - **Nœuds sur pile** (`setSleepy`) : pas de LWT mais `expire_after` (indisponible après 2 réveils manqués),
   dernier état retenu sur le broker, jamais de portail ni de redémarrage en boucle si le WiFi manque.
+- Réglages sur place depuis HA (Paramètres de l'appareil), sans recompiler : durées de montée/descente des
+  volets, délai d'extinction de la lumière, correction de température.
 - Les automatismes critiques (hors-gel, lumière auto, arrêt des volets) tournent en local, sans HA ni WiFi.
 
 Les 8 nœuds compilent pour les 3 cartes (24 environnements) ;

@@ -34,6 +34,8 @@
 - [ ] Copier `homeassistant/packages/senior_care.yaml` dans `/config/packages/`, adapter les
       `entity_id` à ceux du site, vérifier (`homeassistant/check_config.sh` ou Outils de développement >
       Vérifier la configuration), redémarrer HA.
+- [ ] Tableau de bord du proche : copier `homeassistant/dashboards/tranquillite.yaml` dans
+      `/config/dashboards/` et l'enregistrer (bloc `lovelace:` en tête du fichier), adapter les `entity_id`.
 - [ ] Lancer le script **Tester les alertes du proche** : les 2 notifications arrivent, la 2ᵉ sonne
       téléphone en silencieux.
 

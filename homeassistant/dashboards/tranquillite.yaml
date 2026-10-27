@@ -1,0 +1,93 @@
+# Tableau de bord "Tranquillité" pour le proche aidant (mode YAML).
+# Installation : copier ce fichier dans /config/dashboards/ et ajouter dans configuration.yaml :
+#   lovelace:
+#     dashboards:
+#       tableau-tranquillite:
+#         mode: yaml
+#         title: Tranquillité
+#         icon: mdi:home-heart
+#         show_in_sidebar: true
+#         filename: dashboards/tranquillite.yaml
+# ADAPTER les entity_id à ceux du site (mêmes noms que dans packages/senior_care.yaml).
+title: Tranquillité
+views:
+  - title: Maison
+    path: maison
+    icon: mdi:home-heart
+    cards:
+      # Bandeaux rouges visibles uniquement en cas de problème
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: binary_sensor.fuite_d_eau_quelque_part
+            state: "on"
+        card:
+          type: markdown
+          content: "## 💧 Fuite d'eau détectée\nCouper l'arrivée d'eau, puis acquitter l'alerte ci-dessous."
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: binary_sensor.activite_recente_a_la_maison
+            state: "off"
+        card:
+          type: markdown
+          content: "## ⚠️ Aucune activité détectée récemment\nUn appel est conseillé."
+
+      - type: entities
+        title: Alertes
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.activite_recente_a_la_maison
+            name: Activité récente
+          - entity: input_boolean.senior_alerts_enabled
+            name: Alertes actives (couper en cas d'absence)
+          - entity: input_number.senior_inactivity_hours
+            name: Alerte si aucune présence pendant (h)
+          - entity: alert.fuite_d_eau
+            name: Alerte fuite (cliquer pour acquitter)
+          - entity: script.senior_test_alertes
+            name: Tester les alertes
+
+      - type: glance
+        title: Sécurité
+        entities:
+          - entity: binary_sensor.door_entree_ouverture
+            name: Porte d'entrée
+          - entity: binary_sensor.leak_cuisine_fuite
+            name: Fuite cuisine
+          - entity: binary_sensor.leak_salle_de_bain_fuite
+            name: Fuite SdB
+
+      - type: history-graph
+        title: Présence sur 24 h
+        hours_to_show: 24
+        entities:
+          - entity: binary_sensor.presence_salon_presence
+            name: Salon
+          - entity: binary_sensor.presence_chambre_presence
+            name: Chambre
+          - entity: binary_sensor.presence_cuisine_presence
+            name: Cuisine
+
+      - type: thermostat
+        entity: climate.heating_salon_thermostat
+
+      - type: entities
+        title: Confort
+        entities:
+          - entity: sensor.climate_salon_temperature
+            name: Température salon
+          - entity: sensor.climate_chambre_temperature
+            name: Température chambre
+          - entity: sensor.air_chambre_co2
+            name: CO2 chambre
+
+      - type: entities
+        title: Entretien des capteurs
+        entities:
+          - entity: sensor.door_entree_batterie
+            name: Pile porte d'entrée
+          - entity: sensor.leak_cuisine_batterie
+            name: Pile fuite cuisine
+          - entity: binary_sensor.presence_salon_defaut_radar
+            name: Radar salon

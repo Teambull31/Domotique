@@ -7,7 +7,7 @@
 #include <vector>
 #include "DomoPins.h"
 
-#define DOMO_VERSION "0.4.0"  // affichée dans HA (appareil > version du logiciel)
+#define DOMO_VERSION "0.5.0"  // affichée dans HA (appareil > version du logiciel)
 
 // Socle commun des nœuds : portail de configuration (WiFi/MQTT/pièce saisis au 1er démarrage,
 // stockés en flash), MQTT avec LWT, OTA, auto-découverte Home Assistant.
