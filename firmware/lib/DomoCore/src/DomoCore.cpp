@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include <WiFiManager.h>
 #include <esp_task_wdt.h>
+#include <esp_timer.h>
 
 #define WDT_TIMEOUT_S 60  // boucle bloquée plus de 60 s (bus I2C figé...) -> redémarrage
 
@@ -137,6 +138,7 @@ bool DomoCore::connectMQTT() {
 
 void DomoCore::loop() {
   if (!_sleepySec) esp_task_wdt_reset();
+  if (_restartAt && millis() - _restartAt > 500) ESP.restart();
   if (_otaOn) ArduinoOTA.handle();
   // La reconnexion WiFi est automatique, mais la pile WiFi de l'ESP32 reste parfois coincée
   // (box redémarrée, changement de canal) : au-delà de 15 min sans MQTT, on redémarre.
@@ -178,6 +180,10 @@ void DomoCore::flush(uint32_t ms) {
 void DomoCore::handleMessage(byte* payload, unsigned int len) {
   JsonDocument doc;
   if (deserializeJson(doc, payload, len) != DeserializationError::Ok) return;
+  if (doc["restart"] | false) {
+    _restartAt = millis() | 1;  // laisser partir l'accusé MQTT avant de redémarrer
+    return;
+  }
   if (_handler) _handler(doc);
 }
 
@@ -281,13 +287,27 @@ void DomoCore::publishDiscovery() {
     serializeJson(doc, payload);
     _mqtt.publish(topic.c_str(), payload.c_str(), true);
   }
+  // Bouton "Redémarrer" : dépannage à distance sans se déplacer
+  JsonDocument btn;
+  btn["name"] = "Redémarrer";
+  btn["unique_id"] = _id + "_restart";
+  btn["has_entity_name"] = true;
+  btn["entity_category"] = "config";
+  btn["device_class"] = "restart";
+  btn["command_topic"] = _tCommand;
+  btn["payload_press"] = "{\"restart\":true}";
+  btn["availability_topic"] = _tStatus;
+  addDevice(btn);
+  String payload;
+  serializeJson(btn, payload);
+  _mqtt.publish(("homeassistant/button/" + _id + "/restart/config").c_str(), payload.c_str(), true);
   _lastDiag = 0;  // diagnostic envoyé dès la prochaine boucle
 }
 
 void DomoCore::publishDiag() {
   JsonDocument doc;
   doc["rssi"] = WiFi.RSSI();
-  doc["uptime"] = roundf(millis() / 360000.0f) / 10.0f;
+  doc["uptime"] = roundf(esp_timer_get_time() / 360000000.0) / 10.0;  // 64 bits : pas de retour à 0 à 49 j
   String out;
   serializeJson(doc, out);
   _mqtt.publish(_tDiag.c_str(), out.c_str(), true);
