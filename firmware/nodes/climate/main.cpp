@@ -22,6 +22,8 @@ void setup() {
   core.addEntity("sensor", "temperature", "Température", "temperature", "°C");
   core.addEntity("sensor", "humidity", "Humidité", "humidity", "%");
   core.addEntity("sensor", "pressure", "Pression", "pressure", "hPa");
+  core.addEntity("binary_sensor", "sensor_fault", "Défaut capteur", "problem",
+                 nullptr, "{\"entity_category\":\"diagnostic\"}");
   core.addEntity("number", "temp_offset", "Correction température", nullptr, "°C", "{\"min\":-5,\"max\":5,\"step\":0.1,\"mode\":\"box\",\"entity_category\":\"config\"}");
   prefs.begin("climate", false);
   offset = prefs.getFloat("offset", 0);
@@ -41,18 +43,29 @@ void loop() {
   lastSend = millis();
   // Capteur absent ou rebranché : nouvel essai à chaque intervalle plutôt qu'un nœud muet à vie
   if (!bmeOk) bmeOk = bme.begin(0x76) || bme.begin(0x77);
-  if (!bmeOk) return;
 
-  float t = bme.readTemperature(), h = bme.readHumidity(), p = bme.readPressure() / 100.0f;
-  // Fil débranché = valeurs aberrantes (pas forcément NaN) : on ne publie rien de faux
+  JsonDocument doc;
+  doc["temp_offset"] = offset;
+  float t = NAN, h = NAN, p = NAN;
+  if (bmeOk) {
+    t = bme.readTemperature();
+    h = bme.readHumidity();
+    p = bme.readPressure() / 100.0f;
+  }
+  // Capteur absent, ou fil débranché = valeurs aberrantes (pas forcément NaN) : publier null
+  // (HA affiche "inconnu" au lieu de garder la dernière valeur retenue) et le défaut.
   if (!(t > -40 && t < 85 && h >= 0 && h <= 100 && p > 300 && p < 1100)) {
     bmeOk = false;
+    doc["temperature"] = nullptr;
+    doc["humidity"] = nullptr;
+    doc["pressure"] = nullptr;
+    doc["sensor_fault"] = true;
+    core.publishTelemetry(doc);
     return;
   }
-  JsonDocument doc;
+  doc["sensor_fault"] = false;
   doc["temperature"] = roundf((t + offset) * 10) / 10.0;
   doc["humidity"]    = roundf(h * 10) / 10.0;
   doc["pressure"]    = roundf(p * 10) / 10.0;
-  doc["temp_offset"] = offset;
   core.publishTelemetry(doc);
 }

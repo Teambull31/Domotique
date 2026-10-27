@@ -153,7 +153,10 @@ automation:
       # radar de présence débranché / en panne : l'alerte d'inactivité n'est plus fiable
       - platform: state
         entity_id: [binary_sensor.presence_salon_defaut_radar, binary_sensor.presence_chambre_defaut_radar,
-                    binary_sensor.presence_cuisine_defaut_radar]
+                    binary_sensor.presence_cuisine_defaut_radar,
+                    # sonde de température morte : thermostat coupé par sécurité, alerte chaud/froid aveugle
+                    binary_sensor.heating_salon_defaut_capteur, binary_sensor.climate_salon_defaut_capteur,
+                    binary_sensor.climate_chambre_defaut_capteur]
         to: "on"
         for: "00:10:00"
     action:

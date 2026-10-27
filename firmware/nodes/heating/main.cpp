@@ -21,7 +21,7 @@ bool bmeOk = false, enabled = true, heating = false, dirty = true;
 float setpoint = 19.0f, temp = NAN, offset = 0;  // offset : correction du capteur (°C)
 unsigned long lastSend = 0, lastValid = 0, windowSince = 0, lastSwitch = 0;
 bool switchedOnce = false;
-bool windowOpen = false;
+bool windowOpen = false, sensorFault = false;
 float history[6];  // une mesure par minute sur 5 min
 int histCount = 0;
 
@@ -52,6 +52,8 @@ void setup() {
   })");
   core.addEntity("binary_sensor", "heating", "En chauffe", "heat");
   core.addEntity("number", "temp_offset", "Correction température", nullptr, "°C", "{\"min\":-5,\"max\":5,\"step\":0.1,\"mode\":\"box\",\"entity_category\":\"config\"}");
+  core.addEntity("binary_sensor", "sensor_fault", "Défaut capteur", "problem",
+                 nullptr, "{\"entity_category\":\"diagnostic\"}");
   core.addEntity("binary_sensor", "window", "Fenêtre ouverte détectée", "window");
   core.onCommand([](JsonDocument& d) {
     if (d["setpoint"].is<float>()) {
@@ -72,6 +74,11 @@ void setup() {
 void loop() {
   core.loop();
   static unsigned long lastRead = 0;
+  static unsigned long lastRetry = 0;
+  if (!bmeOk && millis() - lastRetry >= 30000) {  // capteur absent au démarrage ou rebranché
+    lastRetry = millis();
+    bmeOk = bme.begin(0x76) || bme.begin(0x77);
+  }
   if (bmeOk && millis() - lastRead >= 5000) {
     lastRead = millis();
     float t = bme.readTemperature();
@@ -115,10 +122,19 @@ void loop() {
     dirty = true;
   }
 
-  if ((dirty || millis() - lastSend >= SEND_INTERVAL_MS) && !isnan(temp)) {
+  // Publié même capteur muet : null -> HA affiche "inconnu" (pas la dernière valeur retenue) et
+  // "Défaut capteur" -> le proche sait que le chauffage est coupé par sécurité.
+  bool faultNow = isnan(temp) && millis() > 15000;  // pas de faux défaut pendant le démarrage
+  if (faultNow != sensorFault) { sensorFault = faultNow; dirty = true; }
+  if (dirty || millis() - lastSend >= SEND_INTERVAL_MS) {
     JsonDocument doc;
-    doc["temperature"] = roundf(temp * 10) / 10.0;
-    doc["humidity"] = roundf(bme.readHumidity() * 10) / 10.0;
+    doc["temperature"] = nullptr;  // remplacés ci-dessous si la mesure est valide
+    doc["humidity"] = nullptr;
+    if (!isnan(temp)) {
+      doc["temperature"] = roundf(temp * 10) / 10.0;
+      doc["humidity"] = roundf(bme.readHumidity() * 10) / 10.0;
+    }
+    doc["sensor_fault"] = sensorFault;
     doc["setpoint"] = setpoint;
     doc["enabled"] = enabled;
     doc["heating"] = heating;
