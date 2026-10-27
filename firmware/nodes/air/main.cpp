@@ -1,18 +1,30 @@
-// Nœud "air" : CO2 + température + humidité (SCD40, I2C) et particules PM1/2.5/10 (PMS5003, UART2).
-// SCD40 : I2C PIN_SDA/PIN_SCL.  PMS5003 : TX capteur -> PIN_UART_RX, alim 5 V.
+// Nœud "air" : CO2 + température + humidité (SCD40, I2C) et particules PM1/2.5/10 (PMS5003, UART).
+// SCD40 : I2C PIN_SDA/PIN_SCL.  PMS5003 : TX capteur -> PIN_UART_RX, RX capteur <- PIN_UART_TX (veille), alim 5 V.
 // Broches selon la carte : lib/DomoCore/src/DomoPins.h
+// Le PMS5003 (ventilateur, ~8000 h de vie) est mis en veille entre deux mesures de particules.
 #include <Adafruit_PM25AQI.h>
 #include <DomoCore.h>
 #include <SensirionI2CScd4x.h>
 #include <Wire.h>
 
 #define SEND_INTERVAL_MS 30000
+#define PM_PERIOD_MS (5UL * 60UL * 1000UL)  // une mesure de particules toutes les 5 min
+#define PM_WARMUP_MS 30000UL                // le ventilateur doit tourner 30 s avant une mesure fiable
 
 DomoCore core("air");
 SensirionI2CScd4x scd4x;
 Adafruit_PM25AQI pms;
-bool pmsOk = false;
-unsigned long lastSend = 0;
+bool pmsOk = false, pmAwake = false, pmFlushed = false, havePm = false;
+uint16_t pm1 = 0, pm25 = 0, pm10 = 0;
+unsigned long lastSend = 0, pmWakeAt = 0, pmSleptAt = 0;
+
+void pmsCommand(bool wake) {
+  const uint8_t cmd[] = {0x42, 0x4D, 0xE4, 0x00, (uint8_t)wake, 0x01, (uint8_t)(wake ? 0x74 : 0x73)};
+  Serial1.write(cmd, sizeof(cmd));
+  pmAwake = wake;
+  if (wake) { pmWakeAt = millis(); pmFlushed = false; }
+  else pmSleptAt = millis();
+}
 
 void setup() {
   Serial.begin(115200);
@@ -23,6 +35,7 @@ void setup() {
 
   Serial1.begin(9600, SERIAL_8N1, PIN_UART_RX, PIN_UART_TX);
   pmsOk = pms.begin_UART(&Serial1);
+  if (pmsOk) pmsCommand(true);  // le capteur a pu rester en veille avant un redémarrage de l'ESP32
 
   core.addEntity("sensor", "co2", "CO2", "carbon_dioxide", "ppm");
   core.addEntity("sensor", "temperature", "Température", "temperature", "°C");
@@ -35,8 +48,28 @@ void setup() {
 
 void loop() {
   core.loop();
-  if (millis() - lastSend < SEND_INTERVAL_MS) return;
 
+  if (pmsOk) {
+    if (!pmAwake && millis() - pmSleptAt >= PM_PERIOD_MS - PM_WARMUP_MS) pmsCommand(true);
+    if (pmAwake && millis() - pmWakeAt >= PM_WARMUP_MS) {
+      if (!pmFlushed) {  // jeter les trames du préchauffage restées dans le tampon UART
+        while (Serial1.available()) Serial1.read();
+        pmFlushed = true;
+      }
+      PM25_AQI_Data d;
+      if (pms.read(&d)) {
+        pm1 = d.pm10_env;
+        pm25 = d.pm25_env;
+        pm10 = d.pm100_env;
+        havePm = true;
+        pmsCommand(false);
+      } else if (millis() - pmWakeAt > PM_WARMUP_MS + 10000) {
+        pmsCommand(false);  // pas de trame valide : on réessaiera au prochain cycle
+      }
+    }
+  }
+
+  if (millis() - lastSend < SEND_INTERVAL_MS) return;
   JsonDocument doc;
   uint16_t co2 = 0;
   float t = 0, h = 0;
@@ -45,11 +78,10 @@ void loop() {
     doc["temperature"] = roundf(t * 10) / 10.0;
     doc["humidity"] = roundf(h * 10) / 10.0;
   }
-  PM25_AQI_Data d;
-  if (pmsOk && pms.read(&d)) {
-    doc["pm1"] = d.pm10_env;
-    doc["pm25"] = d.pm25_env;
-    doc["pm10"] = d.pm100_env;
+  if (havePm) {  // dernière mesure de particules (valable 5 min)
+    doc["pm1"] = pm1;
+    doc["pm25"] = pm25;
+    doc["pm10"] = pm10;
   }
   if (doc.size() == 0) return;  // pas encore de mesure valide : réessayer au prochain tour
   lastSend = millis();
