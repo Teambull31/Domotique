@@ -5,8 +5,32 @@
 #include <WiFiManager.h>
 #include <esp_task_wdt.h>
 #include <esp_timer.h>
+#include <esp_wifi.h>
 
 #define WDT_TIMEOUT_S 60  // boucle bloquée plus de 60 s (bus I2C figé...) -> redémarrage
+
+// Nœuds sur pile : canal et point d'accès du dernier réveil, conservés pendant le deep sleep.
+// Connexion directe au réveil suivant, sans recherche sur tous les canaux (étape la plus longue).
+RTC_DATA_ATTR static int32_t rtcChannel = 0;
+RTC_DATA_ATTR static uint8_t rtcBssid[6];
+
+// Reconnexion rapide d'un nœud sur pile avec le canal/BSSID mémorisés ; false -> chemin normal.
+static bool fastReconnect() {
+  if (rtcChannel <= 0 || esp_reset_reason() != ESP_RST_DEEPSLEEP) return false;
+  WiFi.mode(WIFI_STA);
+  wifi_config_t conf;
+  if (esp_wifi_get_config(WIFI_IF_STA, &conf) != ESP_OK || !conf.sta.ssid[0]) return false;
+  char ssid[33] = {0}, pass[65] = {0};
+  memcpy(ssid, conf.sta.ssid, sizeof(conf.sta.ssid));
+  memcpy(pass, conf.sta.password, sizeof(conf.sta.password));
+  WiFi.begin(ssid, pass, rtcChannel, rtcBssid);
+  unsigned long t0 = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < 4000) delay(10);
+  if (WiFi.status() == WL_CONNECTED) return true;
+  rtcChannel = 0;  // box changée de canal ou remplacée : recherche complète
+  WiFi.disconnect();
+  return false;
+}
 
 DomoCore::DomoCore(const char* nodeType) : _nodeType(nodeType), _mqtt(_wifi) {}
 
@@ -44,6 +68,14 @@ void DomoCore::begin() {
   _pass = prefs.getString("pass", "");
   _ota  = prefs.getString("ota", "");
 
+  // Identifiant unique par nœud : 2 capteurs du même type dans une pièce partageraient sinon
+  // leurs topics MQTT et se déconnecteraient l'un l'autre en boucle.
+  _id = _nodeType + "-" + slug(_room);
+  String label = _label;
+  label.trim();
+  if (label.length()) _id += "-" + slug(label);
+  // Nom visible dans la liste des appareils de la box : à définir AVANT le démarrage du WiFi
+  WiFi.setHostname(_id.c_str());
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
   char portBuf[8];
@@ -66,6 +98,8 @@ void DomoCore::begin() {
   if (forcePortal) {
     wm.startConfigPortal(ap.c_str());
     if (!save) ESP.restart();  // portail fermé sans enregistrer : démarrage normal
+  } else if (_sleepySec && !_host.isEmpty() && fastReconnect()) {
+    // réveil sur pile : connecté directement au point d'accès mémorisé
   } else {
     // Déjà configuré : jamais de portail automatique. Box redémarrée après une coupure (plus lente
     // que l'ESP32) ou en panne : le nœud continue ses automatismes locaux (hors-gel, lumière auto)
@@ -92,19 +126,16 @@ void DomoCore::begin() {
     ESP.restart();  // recharge proprement avec la config enregistrée
   }
 
-  // Identifiant unique par nœud : 2 capteurs du même type dans une pièce partageraient sinon
-  // leurs topics MQTT et se déconnecteraient l'un l'autre en boucle.
-  _id = _nodeType + "-" + slug(_room);
-  String label = _label;
-  label.trim();
-  if (label.length()) _id += "-" + slug(label);
   String base = "home/devices/" + _id;
   _tTelemetry = base + "/telemetry";
   _tStatus    = base + "/status";
   _tCommand   = base + "/command";
   _tDiag      = base + "/diag";
 
-  WiFi.setHostname(_id.c_str());
+  if (_sleepySec && WiFi.status() == WL_CONNECTED) {  // mémorisé pour le prochain réveil
+    rtcChannel = WiFi.channel();
+    memcpy(rtcBssid, WiFi.BSSID(), sizeof(rtcBssid));
+  }
   WiFi.setAutoReconnect(true);
   // OTA uniquement si un mot de passe est défini : jamais de mise à jour WiFi ouverte.
   if (_ota.length() >= 8) {
