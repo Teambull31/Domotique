@@ -15,10 +15,9 @@ DomoCore core("presence");
 ld2410 radar;
 bool radarOk = false;
 bool lightOn = false;
-bool autoMode = true;
+domo::PresenceLight ctl;  // présence confirmée, lumière auto et forçage manuel (DomoLogic.h)
+unsigned long lastSend = 0, lastRadarOk = 0, lastRetry = 0;
 bool present = false;
-bool manual = false;  // lumière forcée depuis HA : l'auto reprend quand la pièce est vide
-unsigned long lastPresence = 0, lastSend = 0, lastRadarOk = 0, lastRetry = 0;
 bool radarFault = false;
 Preferences prefs;
 float offMin = 5;  // extinction N min après la dernière présence (réglable dans HA)
@@ -50,8 +49,8 @@ void setup() {
   core.addEntity("binary_sensor", "radar_fault", "Défaut radar", "problem",
                  nullptr, "{\"entity_category\":\"diagnostic\"}");
   core.onCommand([](JsonDocument& d) {
-    if (d["auto"].is<bool>()) { autoMode = d["auto"]; dirty = true; }
-    if (d["light"].is<bool>()) { manual = true; setLight(d["light"]); }
+    if (d["auto"].is<bool>()) { ctl.autoMode = d["auto"]; dirty = true; }
+    if (d["light"].is<bool>()) { ctl.force(d["light"]); setLight(d["light"]); }
     if (d["off_min"].is<float>()) {
       offMin = domo::sanitize(d["off_min"], 1, 60, offMin);
       prefs.putFloat("off_min", offMin);
@@ -77,20 +76,14 @@ void loop() {
   if (radarOk && radar.isConnected()) {
     bool detected = radar.presenceDetected();
     if (detected) {
-      lastPresence = millis();
       distance = radar.movingTargetDetected() ? radar.movingTargetDistance()
                                               : radar.stationaryTargetDistance();
     } else {
       distance = 0;
     }
-    bool now = detected || (lastPresence && millis() - lastPresence < ABSENT_HOLD_MS);
-    if (now != present) { present = now; dirty = true; }
-    // Forçage manuel (ex. lumière éteinte pour dormir) respecté tant que la pièce est occupée
-    if (manual && !present && millis() - lastPresence > OFF_DELAY_MS) manual = false;
-    if (autoMode && !manual) {
-      if (present) setLight(true);
-      else if (millis() - lastPresence > OFF_DELAY_MS) setLight(false);
-    }
+    ctl.update(detected, millis(), ABSENT_HOLD_MS, OFF_DELAY_MS);
+    if (ctl.present() != present) { present = ctl.present(); dirty = true; }
+    setLight(ctl.light());
   }
 
   if (dirty || millis() - lastSend >= SEND_INTERVAL_MS) {
@@ -104,7 +97,7 @@ void loop() {
       doc["distance"] = distance;
     }
     doc["light"] = lightOn;
-    doc["auto"] = autoMode;
+    doc["auto"] = ctl.autoMode;
     doc["radar_fault"] = radarFault;
     doc["off_min"] = offMin;
     if (core.publishTelemetry(doc)) { lastSend = millis(); dirty = false; }

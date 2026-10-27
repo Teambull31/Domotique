@@ -39,6 +39,40 @@ private:
   float drop_;
 };
 
+// Présence confirmée et lumière automatique d'une pièce (nœud "presence").
+// - absence confirmée après `holdMs` sans détection (le radar brut clignote) ;
+// - lumière allumée sur présence, éteinte `offDelayMs` après la dernière détection ;
+// - un forçage manuel (ex. lumière éteinte pour dormir) est respecté tant que la pièce est occupée,
+//   l'automatique reprend quand elle est vide depuis `offDelayMs`.
+class PresenceLight {
+public:
+  bool autoMode = true;
+
+  void update(bool detected, unsigned long now, unsigned long holdMs, unsigned long offDelayMs) {
+    if (detected) {
+      last_ = now;
+      seen_ = true;
+    }
+    present_ = detected || (seen_ && now - last_ < holdMs);  // jamais "présent" au démarrage
+    if (manual_ && !present_ && now - last_ > offDelayMs) manual_ = false;
+    if (autoMode && !manual_) {
+      if (present_) light_ = true;
+      else if (now - last_ > offDelayMs) light_ = false;
+    }
+  }
+  void force(bool on) {
+    manual_ = true;
+    light_ = on;
+  }
+  bool present() const { return present_; }
+  bool light() const { return light_; }
+  bool manual() const { return manual_; }
+
+private:
+  unsigned long last_ = 0;
+  bool seen_ = false, present_ = false, light_ = false, manual_ = false;
+};
+
 // Réglage relu en mémoire flash ou reçu de HA : borné, et valeur par défaut si NaN
 // (une consigne NaN rendrait toutes les comparaisons fausses : plus de chauffe, même hors-gel).
 inline float sanitize(float v, float lo, float hi, float def) {

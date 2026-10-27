@@ -6,6 +6,7 @@
 #include <initializer_list>
 
 using domo::thermostatWant;
+using domo::PresenceLight;
 using domo::WindowDetector;
 using domo::batteryPercent;
 using domo::shutterMoveMs;
@@ -102,6 +103,58 @@ void test_thermostat_consigne_nan_garde_le_hors_gel() {
   TEST_ASSERT_TRUE(thermostatWant(5.0f, target, 0.3f, false));
 }
 
+// --- Présence et lumière automatique ---
+static const unsigned long HOLD = 10000, OFF = 5UL * 60 * 1000;
+
+void test_presence_rien_au_demarrage() {
+  PresenceLight p;
+  p.update(false, 500, HOLD, OFF);  // millis() petit au démarrage
+  TEST_ASSERT_FALSE(p.present());
+  TEST_ASSERT_FALSE(p.light());
+}
+void test_presence_allume_et_maintient_10s() {
+  PresenceLight p;
+  p.update(true, 1000, HOLD, OFF);
+  TEST_ASSERT_TRUE(p.present());
+  TEST_ASSERT_TRUE(p.light());
+  p.update(false, 1000 + HOLD - 1, HOLD, OFF);
+  TEST_ASSERT_TRUE(p.present());  // clignotement du radar absorbé
+  p.update(false, 1000 + HOLD + 1, HOLD, OFF);
+  TEST_ASSERT_FALSE(p.present());
+  TEST_ASSERT_TRUE(p.light());  // reste allumée jusqu'au délai d'extinction
+}
+void test_presence_eteint_apres_delai() {
+  PresenceLight p;
+  p.update(true, 1000, HOLD, OFF);
+  p.update(false, 1000 + OFF + 1, HOLD, OFF);
+  TEST_ASSERT_FALSE(p.light());
+}
+void test_forcage_respecte_tant_que_occupe() {
+  PresenceLight p;
+  p.update(true, 1000, HOLD, OFF);
+  p.force(false);  // "éteindre pour dormir"
+  for (unsigned long t = 2000; t < 3600000; t += 60000) {
+    p.update(true, t, HOLD, OFF);  // toujours quelqu'un dans la pièce
+    TEST_ASSERT_FALSE(p.light());
+  }
+}
+void test_auto_reprend_quand_piece_vide() {
+  PresenceLight p;
+  p.update(true, 1000, HOLD, OFF);
+  p.force(false);
+  p.update(false, 1000 + OFF + 1, HOLD, OFF);  // pièce vide depuis le délai
+  TEST_ASSERT_FALSE(p.manual());
+  p.update(true, 1000 + OFF + 5000, HOLD, OFF);  // quelqu'un revient
+  TEST_ASSERT_TRUE(p.light());
+}
+void test_mode_auto_desactive() {
+  PresenceLight p;
+  p.autoMode = false;
+  p.update(true, 1000, HOLD, OFF);
+  TEST_ASSERT_TRUE(p.present());
+  TEST_ASSERT_FALSE(p.light());
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -123,5 +176,11 @@ int main() {
   RUN_TEST(test_reglage_borne);
   RUN_TEST(test_reglage_nan_remplace_par_defaut);
   RUN_TEST(test_thermostat_consigne_nan_garde_le_hors_gel);
+  RUN_TEST(test_presence_rien_au_demarrage);
+  RUN_TEST(test_presence_allume_et_maintient_10s);
+  RUN_TEST(test_presence_eteint_apres_delai);
+  RUN_TEST(test_forcage_respecte_tant_que_occupe);
+  RUN_TEST(test_auto_reprend_quand_piece_vide);
+  RUN_TEST(test_mode_auto_desactive);
   return UNITY_END();
 }
