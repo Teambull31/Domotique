@@ -8,6 +8,7 @@
 
 #define RELAY_PIN PIN_RELAY1
 #define SEND_INTERVAL_MS 30000
+#define ABSENT_HOLD_MS 10000  // absence confirmée après 10 s sans détection (anti-clignotement)
 
 DomoCore core("presence");
 ld2410 radar;
@@ -73,14 +74,15 @@ void loop() {
   bool fault = millis() - lastRadarOk > 10000;
   if (fault != radarFault) { radarFault = fault; dirty = true; }
   if (radarOk && radar.isConnected()) {
-    bool now = radar.presenceDetected();
-    if (now) {
+    bool detected = radar.presenceDetected();
+    if (detected) {
       lastPresence = millis();
       distance = radar.movingTargetDetected() ? radar.movingTargetDistance()
                                               : radar.stationaryTargetDistance();
     } else {
       distance = 0;
     }
+    bool now = detected || (lastPresence && millis() - lastPresence < ABSENT_HOLD_MS);
     if (now != present) { present = now; dirty = true; }
     // Forçage manuel (ex. lumière éteinte pour dormir) respecté tant que la pièce est occupée
     if (manual && !present && millis() - lastPresence > OFF_DELAY_MS) manual = false;
@@ -92,8 +94,14 @@ void loop() {
 
   if (dirty || millis() - lastSend >= SEND_INTERVAL_MS) {
     JsonDocument doc;
-    doc["presence"] = present;
-    doc["distance"] = distance;
+    // Radar en défaut : présence "inconnue" dans HA. Une valeur figée à "présent" masquerait
+    // une vraie inactivité (fausse tranquillité pour le proche).
+    doc["presence"] = nullptr;
+    doc["distance"] = nullptr;
+    if (!radarFault) {
+      doc["presence"] = present;
+      doc["distance"] = distance;
+    }
     doc["light"] = lightOn;
     doc["auto"] = autoMode;
     doc["radar_fault"] = radarFault;
