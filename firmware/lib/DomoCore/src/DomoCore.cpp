@@ -143,6 +143,11 @@ void DomoCore::begin() {
   _mqtt.setServer(_host.c_str(), _port);
   _mqtt.setBufferSize(2048);  // discovery du thermostat ~1,3 ko
   _mqtt.setKeepAlive(30);
+  // Broker local : il répond en millisecondes. Délais courts pour qu'une tentative de connexion
+  // ne bloque pas les automatismes (fin de course d'un volet) : 1 s TCP, 2 s pour la réponse MQTT
+  // (au lieu de 3 s et 15 s par défaut).
+  _wifi.setTimeout(1);
+  _mqtt.setSocketTimeout(2);
   _mqtt.setCallback([this](char* topic, byte* p, unsigned int l) {
     // Home Assistant redémarré : republier la discovery (après l'appel, le tampon MQTT est partagé)
     if (!strcmp(topic, "homeassistant/status")) _rediscover = (l == 6 && !memcmp(p, "online", 6));
@@ -182,9 +187,14 @@ void DomoCore::loop() {
   else if (millis() - _lastOnline > 15UL * 60UL * 1000UL) ESP.restart();
   if (WiFi.status() != WL_CONNECTED) return;
   if (!_mqtt.connected()) {
-    if (millis() - _lastTry < 5000) return;  // essai MQTT toutes les 5 s, sans bloquer
-    _lastTry = millis();
-    if (!connectMQTT()) return;
+    // Essais espacés progressivement (5 s -> 60 s) quand HA/le broker est arrêté longtemps
+    if (_lastTry && millis() - _lastTry < _retryMs) return;  // 1er essai immédiat
+    _lastTry = millis() | 1;
+    if (!connectMQTT()) {
+      _retryMs = min(_retryMs * 2, 60000UL);
+      return;
+    }
+    _retryMs = 5000;
   }
   _mqtt.loop();
   if (!_sleepySec && (_lastDiag == 0 || millis() - _lastDiag > 300000UL)) {
@@ -199,10 +209,10 @@ void DomoCore::loop() {
 
 bool DomoCore::waitConnected(uint32_t timeoutMs) {
   unsigned long t0 = millis();
+  // Nœud sur pile : essais rapprochés sans l'espacement progressif de loop() (chaque seconde
+  // éveillé coûte de la pile)
   while (!_mqtt.connected() && millis() - t0 < timeoutMs) {
-    _lastTry = 0;
-    loop();
-    delay(50);
+    if (WiFi.status() != WL_CONNECTED || !connectMQTT()) delay(100);
   }
   return _mqtt.connected();
 }
