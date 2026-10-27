@@ -119,3 +119,47 @@ automation:
     action:
       - service: notify.mobile_app_proche
         data: { title: "Capteur à vérifier", message: "{{ trigger.to_state.name }} : batterie faible, hors ligne ou en défaut." }
+
+  # Nécessite un nœud "power" (pince PZEM) sur le circuit de cuisson, pièce "cuisson".
+  - alias: "Senior - plaque de cuisson allumée longtemps"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.power_cuisson_puissance
+        above: 800
+        for: "01:30:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.senior_alerts_enabled
+        state: "on"
+    action:
+      - service: notify.mobile_app_proche
+        data:
+          title: "Cuisson allumée depuis 1 h 30"
+          message: "La plaque ou le four consomme encore {{ states('sensor.power_cuisson_puissance') }} W. Oubli possible."
+          data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
+
+  # Canicule / froid : les personnes âgées ressentent mal la température et ne s'en plaignent pas.
+  - alias: "Senior - température du logement trop chaude ou trop froide"
+    trigger:
+      - platform: numeric_state
+        entity_id: [sensor.climate_salon_temperature, sensor.climate_chambre_temperature]
+        above: 28
+        for: "01:00:00"
+        id: chaud
+      - platform: numeric_state
+        entity_id: [sensor.climate_salon_temperature, sensor.climate_chambre_temperature]
+        below: 17
+        for: "01:00:00"
+        id: froid
+    condition:
+      - condition: state
+        entity_id: input_boolean.senior_alerts_enabled
+        state: "on"
+    action:
+      - service: notify.mobile_app_proche
+        data:
+          title: "{{ 'Chaleur' if trigger.id == 'chaud' else 'Froid' }} dans le logement"
+          message: >
+            {{ trigger.to_state.name }} : {{ trigger.to_state.state }} °C depuis 1 h.
+            {{ 'Penser à faire boire, fermer les volets côté soleil.' if trigger.id == 'chaud'
+               else 'Vérifier le chauffage.' }}
