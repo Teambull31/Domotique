@@ -2,6 +2,8 @@
 # Copier dans /config/packages/ (homeassistant: packages: !include_dir_named packages).
 # ADAPTER les entity_id (voir Paramètres > Appareils) et notify.mobile_app_* (téléphone du proche).
 # Principe : aucune action demandée à la personne âgée ; seul le proche aidant est notifié.
+# Alertes urgentes (fuite, inactivité, porte la nuit) : sonnent même en mode silencieux
+# (Android : canal alarm_stream ; iOS : alerte critique, à autoriser dans l'app Companion).
 
 input_number:
   senior_inactivity_hours:
@@ -47,7 +49,13 @@ automation:
       - platform: state
         entity_id: binary_sensor.activite_recente_a_la_maison
         to: "off"
+      # passé à "off" pendant la nuit (hors plage horaire) : on alerte dès 9 h
+      - platform: time
+        at: "09:00:00"
     condition:
+      - condition: state
+        entity_id: binary_sensor.activite_recente_a_la_maison
+        state: "off"
       - condition: state
         entity_id: input_boolean.senior_alerts_enabled
         state: "on"
@@ -59,7 +67,7 @@ automation:
         data:
           title: "Pas d'activité détectée"
           message: "Aucune présence détectée à la maison depuis un moment. Un appel serait bienvenu."
-          data: { ttl: 0, priority: high }
+          data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
 
   - alias: "Senior - porte d'entrée ouverte la nuit"
     trigger:
@@ -72,7 +80,7 @@ automation:
         before: "06:00:00"
     action:
       - service: notify.mobile_app_proche
-        data: { title: "Porte d'entrée ouverte", message: "La porte d'entrée vient de s'ouvrir en pleine nuit.", data: { priority: high } }
+        data: { title: "Porte d'entrée ouverte", message: "La porte d'entrée vient de s'ouvrir en pleine nuit.", data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } } }
 
   - alias: "Senior - fuite d'eau"
     trigger:
@@ -81,7 +89,7 @@ automation:
         to: "on"
     action:
       - service: notify.mobile_app_proche
-        data: { title: "Fuite d'eau", message: "{{ trigger.to_state.name }} : de l'eau détectée.", data: { priority: high, ttl: 0 } }
+        data: { title: "Fuite d'eau", message: "{{ trigger.to_state.name }} : de l'eau détectée.", data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } } }
 
   - alias: "Senior - CO2 élevé, aérer"
     trigger:
