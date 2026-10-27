@@ -1,5 +1,7 @@
 # Déployer chez un proche ou un client
 
+Checklist pas à pas d'une installation : [`INSTALLATION.md`](INSTALLATION.md).
+
 ## Principe : une installation = un site autonome
 ```
 [capteurs ESP32 / C3 / S3] --WiFi/MQTT--> [Home Assistant du site] --> notifications au proche aidant
