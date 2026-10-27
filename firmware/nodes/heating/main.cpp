@@ -4,6 +4,7 @@
 // Fenêtre ouverte : chute de 1 °C en 5 min -> chauffe suspendue 30 min (hors-gel maintenu).
 #include <Adafruit_BME280.h>
 #include <DomoCore.h>
+#include <DomoLogic.h>
 #include <Preferences.h>
 
 #define RELAY_PIN PIN_RELAY_HEAT  // broches : lib/DomoCore/src/DomoPins.h
@@ -22,8 +23,7 @@ float setpoint = 19.0f, temp = NAN, offset = 0;  // offset : correction du capte
 unsigned long lastSend = 0, lastValid = 0, windowSince = 0, lastSwitch = 0;
 bool switchedOnce = false;
 bool windowOpen = false, sensorFault = false;
-float history[6];  // une mesure par minute sur 5 min
-int histCount = 0;
+domo::WindowDetector window(6, WINDOW_DROP_C);  // une mesure par minute sur 5 min
 
 void setup() {
   Serial.begin(115200);
@@ -64,7 +64,7 @@ void setup() {
     if (d["temp_offset"].is<float>()) {
       offset = constrain((float)d["temp_offset"], -5.0f, 5.0f);
       prefs.putFloat("offset", offset);
-      histCount = 0;  // le saut de mesure ne doit pas passer pour une fenêtre ouverte
+      window.reset();  // le saut de mesure ne doit pas passer pour une fenêtre ouverte
     }
     dirty = true;
   });
@@ -91,10 +91,7 @@ void loop() {
   static unsigned long lastHist = 0;
   if (!isnan(temp) && millis() - lastHist >= 60000UL) {
     lastHist = millis();
-    for (int i = 5; i > 0; i--) history[i] = history[i - 1];
-    history[0] = temp;
-    if (histCount < 6) histCount++;
-    if (!windowOpen && histCount == 6 && history[5] - temp >= WINDOW_DROP_C) {
+    if (window.add(temp) && !windowOpen) {
       windowOpen = true;
       windowSince = millis();
       dirty = true;
@@ -102,16 +99,13 @@ void loop() {
   }
   if (windowOpen && millis() - windowSince >= WINDOW_PAUSE_MS) {
     windowOpen = false;
-    histCount = 0;  // repartir d'un historique propre (la pièce remonte en température)
+    window.reset();  // repartir d'un historique propre (la pièce remonte en température)
     dirty = true;
   }
 
   // Sécurité : sans mesure valide (capteur muet) le relais est coupé
   float target = (enabled && !windowOpen) ? setpoint : FROST_C;
-  bool want = heating;
-  if (isnan(temp)) want = false;  // NOLINT(bugprone-branch-clone) : sécurité capteur muet, lisible à part
-  else if (temp < target - HYSTERESIS) want = true;
-  else if (temp > target + HYSTERESIS) want = false;
+  bool want = domo::thermostatWant(temp, target, HYSTERESIS, heating);
   // Anti-cycles courts (usure chaudière/relais), sauf coupure de sécurité capteur muet
   bool cycleOk = !switchedOnce || millis() - lastSwitch >= MIN_CYCLE_MS || isnan(temp);
   if (want != heating && cycleOk) {
