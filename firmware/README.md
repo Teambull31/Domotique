@@ -57,4 +57,13 @@ le DevKitC pour `air`, `presence` et `shutters`.
 Les 8 nœuds compilent pour les 3 cartes (24 environnements) ;
 ils n'ont pas encore été testés sur du vrai matériel.
 
+## Vérifications (aussi lancées par le CI à chaque push)
+- `pio test -e native` : tests sur PC de la logique critique, sans ESP32 (`lib/DomoCore/src/DomoLogic.h` :
+  thermostat et hors-gel, fenêtre ouverte, position des volets, lumière automatique et forçage manuel,
+  niveau de pile, identifiants, bornage des réglages).
+- `pio check -e <nœud> --skip-packages` : analyse statique clang-tidy.
+- Compilation : tout avertissement dans le code des nœuds est une erreur (`-Werror`).
+- Home Assistant : `homeassistant/check_config.sh` (schéma) et `python homeassistant/test_templates.py`
+  (résultat des alertes calculé par le moteur de HA).
+
 Nouveau nœud : `nodes/<nom>/main.cpp` + une section `[<nom>]` et ses 3 `[env:<nom>...]` dans `platformio.ini`, puis `core.addEntity(...)`.
