@@ -18,30 +18,47 @@ input_boolean:
     initial: true
 
 template:
+  # Horodatage de la dernière activité réelle : une présence détectée ou la porte d'entrée ouverte.
+  # Seuls les passages à "on" comptent : une coupure WiFi d'un capteur (indisponible -> off) ne doit
+  # pas passer pour de l'activité. État conservé au redémarrage de HA.
   - trigger:
-      - platform: time_pattern
-        minutes: "/10"
       - platform: state
         entity_id:
           - binary_sensor.presence_salon_presence
           - binary_sensor.presence_chambre_presence
           - binary_sensor.presence_cuisine_presence
+          - binary_sensor.door_entree_ouverture
+        to: "on"
+    sensor:
+      - name: "Dernière activité à la maison"
+        unique_id: senior_derniere_activite
+        device_class: timestamp
+        icon: mdi:account-clock
+        state: "{{ now().isoformat() }}"
+
+  - trigger:
+      - platform: time_pattern
+        minutes: "/10"
+      - platform: state
+        entity_id:
+          - sensor.derniere_activite_a_la_maison
+          - binary_sensor.presence_salon_presence
+          - binary_sensor.presence_chambre_presence
+          - binary_sensor.presence_cuisine_presence
     binary_sensor:
       - name: "Activité récente à la maison"
-        # vrai si une pièce est occupée, ou l'a été dans la fenêtre choisie.
-        # (après un redémarrage de HA, last_changed repart de zéro : pas de fausse alerte)
+        unique_id: senior_activite_recente
+        # vrai si une pièce est occupée maintenant, ou si la dernière activité date de moins de N h.
+        # Jamais d'activité enregistrée (installation neuve) : considéré actif, pas de fausse alerte.
         state: >
           {% set h = states('input_number.senior_inactivity_hours') | float(8) %}
           {% set rooms = ['binary_sensor.presence_salon_presence',
                           'binary_sensor.presence_chambre_presence',
                           'binary_sensor.presence_cuisine_presence'] %}
-          {% set ns = namespace(active=false) %}
-          {% for r in rooms if states[r] is not none %}
-            {% if is_state(r, 'on') or (now() - states[r].last_changed).total_seconds() < h * 3600 %}
-              {% set ns.active = true %}
-            {% endif %}
-          {% endfor %}
-          {{ ns.active }}
+          {% set last = states('sensor.derniere_activite_a_la_maison') | as_datetime %}
+          {{ rooms | select('is_state', 'on') | list | count > 0
+             or last is none
+             or (now() - last).total_seconds() < h * 3600 }}
 
   - binary_sensor:
       - name: "Fuite d'eau quelque part"

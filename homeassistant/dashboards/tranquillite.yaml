@@ -39,6 +39,8 @@ views:
         entities:
           - entity: binary_sensor.activite_recente_a_la_maison
             name: Activité récente
+          - entity: sensor.derniere_activite_a_la_maison
+            name: Dernière activité
           - entity: input_boolean.senior_alerts_enabled
             name: Alertes actives (couper en cas d'absence)
           - entity: input_number.senior_inactivity_hours

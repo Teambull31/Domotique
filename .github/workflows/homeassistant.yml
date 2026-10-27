@@ -13,3 +13,4 @@ jobs:
         with: { python-version: '3.13', cache: pip }
       - run: pip install homeassistant
       - run: homeassistant/check_config.sh
+      - run: python homeassistant/test_templates.py
