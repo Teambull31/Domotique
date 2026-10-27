@@ -6,6 +6,7 @@
 // Aller en butée (0 ou 100) prolonge la course pour recaler l'estimation.
 // Durées de montée / descente réglables dans HA (Paramètres de l'appareil) : chronométrer chaque volet.
 #include <DomoCore.h>
+#include <DomoLogic.h>
 #include <Preferences.h>
 
 #define UP_PIN PIN_RELAY1
@@ -26,8 +27,7 @@ unsigned long travelMs(State dir) { return (dir == OPENING ? upS : downS) * 1000
 
 float currentPos() {
   if (state == IDLE) return pos;
-  float d = (millis() - moveStart) * 100.0f / travelMs(state);
-  return constrain(state == OPENING ? startPos + d : startPos - d, 0.0f, 100.0f);
+  return domo::shutterPosition(startPos, millis() - moveStart, travelMs(state), state == OPENING);
 }
 
 void halt() {
@@ -59,7 +59,7 @@ void moveTo(float tgt) {
   }
   startPos = pos;
   target = tgt;
-  moveMs = fabsf(tgt - startPos) * travelMs(dir) / 100 + (end ? OVERRUN_MS : 0);
+  moveMs = domo::shutterMoveMs(startPos, tgt, travelMs(dir), OVERRUN_MS);
   prefs.putBool("moving", true);  // coupure/redémarrage en route -> position inconnue au boot
   digitalWrite(dir == OPENING ? UP_PIN : DOWN_PIN, HIGH);
   state = dir;

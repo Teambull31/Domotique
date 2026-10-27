@@ -1,4 +1,5 @@
 #include "DomoCore.h"
+#include "DomoLogic.h"
 #include <ArduinoOTA.h>
 #include <Preferences.h>
 #include <WiFiManager.h>
@@ -9,26 +10,7 @@
 
 DomoCore::DomoCore(const char* nodeType) : _nodeType(nodeType), _mqtt(_wifi) {}
 
-// "Entrée Sud" -> "entree-sud" : accents français translittérés, tirets uniques.
-static String slug(String s) {
-  s.toLowerCase();
-  String o;
-  for (size_t i = 0; i < s.length(); i++) {
-    unsigned char c = s[i];
-    if (c == 0xC3 && i + 1 < s.length()) {  // lettres accentuées UTF-8 (U+00C0..U+00FF)
-      unsigned char n = (unsigned char)s[++i] | 0x20;  // majuscule -> minuscule
-      c = (n >= 0xA0 && n <= 0xA5) ? 'a' : n == 0xA7 ? 'c' : (n >= 0xA8 && n <= 0xAB) ? 'e'
-        : (n >= 0xAC && n <= 0xAF) ? 'i' : (n >= 0xB2 && n <= 0xB6) ? 'o'
-        : (n >= 0xB9 && n <= 0xBC) ? 'u' : '-';
-    } else if (!isalnum(c)) {
-      c = '-';
-    }
-    if (c == '-' && (o.isEmpty() || o.endsWith("-"))) continue;
-    o += (char)c;
-  }
-  if (o.endsWith("-")) o.remove(o.length() - 1);
-  return o.isEmpty() ? String("maison") : o;
-}
+static String slug(const String& s) { return String(domo::slug(s.c_str()).c_str()); }
 
 void DomoCore::begin() {
   Preferences prefs;

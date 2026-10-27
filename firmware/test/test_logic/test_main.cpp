@@ -7,6 +7,10 @@
 
 using domo::thermostatWant;
 using domo::WindowDetector;
+using domo::batteryPercent;
+using domo::shutterMoveMs;
+using domo::shutterPosition;
+using domo::slug;
 
 void setUp() {}
 void tearDown() {}
@@ -47,6 +51,43 @@ void test_fenetre_historique_repart_de_zero_apres_detection() {
   for (int i = 0; i < 5; i++) TEST_ASSERT_FALSE(w.add(18.0f));  // pas de redétection immédiate
 }
 
+// --- Volets ---
+void test_volet_position_mi_course() {
+  TEST_ASSERT_FLOAT_WITHIN(0.01f, 50.0f, shutterPosition(0, 12500, 25000, true));
+  TEST_ASSERT_FLOAT_WITHIN(0.01f, 50.0f, shutterPosition(100, 10000, 20000, false));
+}
+void test_volet_position_bornee_en_butee() {
+  TEST_ASSERT_EQUAL_FLOAT(100.0f, shutterPosition(80, 60000, 25000, true));
+  TEST_ASSERT_EQUAL_FLOAT(0.0f, shutterPosition(20, 60000, 25000, false));
+}
+void test_volet_duree_position_intermediaire_sans_depassement() {
+  TEST_ASSERT_EQUAL_UINT32(5000, shutterMoveMs(20, 40, 25000, 2000));
+}
+void test_volet_duree_butee_avec_depassement_de_recalage() {
+  TEST_ASSERT_EQUAL_UINT32(25000 + 2000, shutterMoveMs(0, 100, 25000, 2000));
+  TEST_ASSERT_EQUAL_UINT32(2000, shutterMoveMs(0, 0, 25000, 2000));  // déjà fermé : recalage seul
+}
+
+// --- Pile ---
+void test_pile_bornes() {
+  TEST_ASSERT_EQUAL_FLOAT(0.0f, batteryPercent(3.0f));
+  TEST_ASSERT_EQUAL_FLOAT(100.0f, batteryPercent(4.3f));
+  TEST_ASSERT_FLOAT_WITHIN(0.1f, 50.0f, batteryPercent(3.75f));
+}
+
+// --- Identifiants ---
+void test_slug_accents_et_espaces() {
+  TEST_ASSERT_EQUAL_STRING("entree", slug("Entrée").c_str());
+  TEST_ASSERT_EQUAL_STRING("salle-de-bain", slug("Salle de bain").c_str());
+  TEST_ASSERT_EQUAL_STRING("etage-ete", slug("ÉTAGE Été").c_str());
+  TEST_ASSERT_EQUAL_STRING("cuisine-sejour", slug("Cuisine/Séjour").c_str());
+}
+void test_slug_tirets_uniques_et_vide() {
+  TEST_ASSERT_EQUAL_STRING("chambre-mamie", slug("  Chambre   Mamie  ").c_str());
+  TEST_ASSERT_EQUAL_STRING("maison", slug("   ").c_str());
+  TEST_ASSERT_EQUAL_STRING("maison", slug("").c_str());
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -58,5 +99,12 @@ int main() {
   RUN_TEST(test_fenetre_baisse_lente_ignoree);
   RUN_TEST(test_fenetre_pas_de_detection_avant_6_mesures);
   RUN_TEST(test_fenetre_historique_repart_de_zero_apres_detection);
+  RUN_TEST(test_volet_position_mi_course);
+  RUN_TEST(test_volet_position_bornee_en_butee);
+  RUN_TEST(test_volet_duree_position_intermediaire_sans_depassement);
+  RUN_TEST(test_volet_duree_butee_avec_depassement_de_recalage);
+  RUN_TEST(test_pile_bornes);
+  RUN_TEST(test_slug_accents_et_espaces);
+  RUN_TEST(test_slug_tirets_uniques_et_vide);
   return UNITY_END();
 }

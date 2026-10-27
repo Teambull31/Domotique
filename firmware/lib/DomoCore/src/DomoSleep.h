@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include "DomoLogic.h"
 #include "DomoPins.h"
 #if !defined(CONFIG_IDF_TARGET_ESP32C3)
 #include <driver/rtc_io.h>
@@ -29,6 +30,5 @@ inline void domoDeepSleep(gpio_num_t pin, int currentLevel, uint64_t heartbeatSe
 inline float domoBatteryPercent(uint8_t adcPin) {
   uint32_t mv = 0;
   for (int i = 0; i < 8; i++) mv += analogReadMilliVolts(adcPin);
-  float v = mv / 8 * 2 / 1000.0f;
-  return constrain((v - 3.3f) / (4.2f - 3.3f) * 100.0f, 0.0f, 100.0f);
+  return domo::batteryPercent(mv / 8 * 2 / 1000.0f);
 }
