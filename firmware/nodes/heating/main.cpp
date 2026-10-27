@@ -18,7 +18,7 @@ DomoCore core("heating");
 Adafruit_BME280 bme;
 Preferences prefs;
 bool bmeOk = false, enabled = true, heating = false, dirty = true;
-float setpoint = 19.0f, temp = NAN;
+float setpoint = 19.0f, temp = NAN, offset = 0;  // offset : correction du capteur (°C)
 unsigned long lastSend = 0, lastValid = 0, windowSince = 0, lastSwitch = 0;
 bool switchedOnce = false;
 bool windowOpen = false;
@@ -35,6 +35,7 @@ void setup() {
   prefs.begin("heating", false);
   setpoint = prefs.getFloat("setpoint", 19.0f);
   enabled = prefs.getBool("enabled", true);
+  offset = prefs.getFloat("offset", 0);
 
   core.addEntity("sensor", "temperature", "Température", "temperature", "°C");
   core.addEntity("sensor", "humidity", "Humidité", "humidity", "%");
@@ -50,6 +51,7 @@ void setup() {
     "action_template": "{{ 'heating' if value_json.heating else ('idle' if value_json.enabled else 'off') }}"
   })");
   core.addEntity("binary_sensor", "heating", "En chauffe", "heat");
+  core.addEntity("number", "temp_offset", "Correction température", nullptr, "°C", "{\"min\":-5,\"max\":5,\"step\":0.1,\"mode\":\"box\",\"entity_category\":\"config\"}");
   core.addEntity("binary_sensor", "window", "Fenêtre ouverte détectée", "window");
   core.onCommand([](JsonDocument& d) {
     if (d["setpoint"].is<float>()) {
@@ -57,6 +59,11 @@ void setup() {
       prefs.putFloat("setpoint", setpoint);
     }
     if (d["enabled"].is<bool>()) { enabled = d["enabled"]; prefs.putBool("enabled", enabled); }
+    if (d["temp_offset"].is<float>()) {
+      offset = constrain((float)d["temp_offset"], -5.0f, 5.0f);
+      prefs.putFloat("offset", offset);
+      histCount = 0;  // le saut de mesure ne doit pas passer pour une fenêtre ouverte
+    }
     dirty = true;
   });
   core.begin();
@@ -69,7 +76,7 @@ void loop() {
     lastRead = millis();
     float t = bme.readTemperature();
     // Capteur débranché = valeurs aberrantes (pas forcément NaN) : on les rejette.
-    if (t > -20.0f && t < 60.0f) { temp = t; lastValid = millis(); }
+    if (t > -20.0f && t < 60.0f) { temp = t + offset; lastValid = millis(); }
   }
   // Plus de mesure valide depuis 2 min : on considère le capteur muet.
   if (!isnan(temp) && millis() - lastValid > 120000UL) temp = NAN;
@@ -116,6 +123,7 @@ void loop() {
     doc["enabled"] = enabled;
     doc["heating"] = heating;
     doc["window"] = windowOpen;
+    doc["temp_offset"] = offset;
     if (core.publishTelemetry(doc)) { lastSend = millis(); dirty = false; }
   }
 }
