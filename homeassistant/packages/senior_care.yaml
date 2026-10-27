@@ -101,7 +101,7 @@ automation:
       - service: notify.mobile_app_proche
         data: { title: "Air confiné", message: "CO2 élevé dans la chambre (> 1500 ppm)." }
 
-  - alias: "Senior - capteur sur pile muet ou batterie faible"
+  - alias: "Senior - capteur muet, en défaut ou batterie faible"
     trigger:
       - platform: numeric_state
         entity_id: [sensor.door_entree_batterie, sensor.leak_cuisine_batterie]
@@ -110,6 +110,12 @@ automation:
         entity_id: [binary_sensor.door_entree_ouverture, binary_sensor.leak_cuisine_fuite]
         to: unavailable
         for: "01:00:00"  # + expire_after (2 h 05) côté capteur ≈ 3 h sans nouvelles
+      # radar de présence débranché / en panne : l'alerte d'inactivité n'est plus fiable
+      - platform: state
+        entity_id: [binary_sensor.presence_salon_defaut_radar, binary_sensor.presence_chambre_defaut_radar,
+                    binary_sensor.presence_cuisine_defaut_radar]
+        to: "on"
+        for: "00:10:00"
     action:
       - service: notify.mobile_app_proche
-        data: { title: "Capteur à vérifier", message: "{{ trigger.to_state.name }} : batterie faible ou hors ligne." }
+        data: { title: "Capteur à vérifier", message: "{{ trigger.to_state.name }} : batterie faible, hors ligne ou en défaut." }

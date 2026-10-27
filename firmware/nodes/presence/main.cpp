@@ -16,7 +16,8 @@ bool lightOn = false;
 bool autoMode = true;
 bool present = false;
 bool manual = false;  // lumière forcée depuis HA : l'auto reprend quand la pièce est vide
-unsigned long lastPresence = 0, lastSend = 0;
+unsigned long lastPresence = 0, lastSend = 0, lastRadarOk = 0, lastRetry = 0;
+bool radarFault = false;
 bool dirty = true;
 
 void setLight(bool on) {
@@ -37,6 +38,8 @@ void setup() {
   core.addEntity("sensor", "distance", "Distance", "distance", "cm");
   core.addEntity("switch", "light", "Lumière");
   core.addEntity("switch", "auto", "Mode automatique");
+  core.addEntity("binary_sensor", "radar_fault", "Défaut radar", "problem",
+                 nullptr, "{\"entity_category\":\"diagnostic\"}");
   core.onCommand([](JsonDocument& d) {
     if (d["auto"].is<bool>()) { autoMode = d["auto"]; dirty = true; }
     if (d["light"].is<bool>()) { manual = true; setLight(d["light"]); }
@@ -48,6 +51,15 @@ void loop() {
   core.loop();
   static float distance = 0;
   radar.read();
+  // Radar absent au démarrage ou débranché : nouvel essai toutes les 30 s
+  if (!radarOk && millis() - lastRetry > 30000) {
+    lastRetry = millis();
+    radarOk = radar.begin(Serial1);
+  }
+  if (radarOk && radar.isConnected()) lastRadarOk = millis();
+  // Défaut signalé à HA : sans radar, "pas de présence" ne veut rien dire (alerte inactivité)
+  bool fault = millis() - lastRadarOk > 10000;
+  if (fault != radarFault) { radarFault = fault; dirty = true; }
   if (radarOk && radar.isConnected()) {
     bool now = radar.presenceDetected();
     if (now) {
@@ -72,6 +84,7 @@ void loop() {
     doc["distance"] = distance;
     doc["light"] = lightOn;
     doc["auto"] = autoMode;
+    doc["radar_fault"] = radarFault;
     if (core.publishTelemetry(doc)) { lastSend = millis(); dirty = false; }
   }
 }
