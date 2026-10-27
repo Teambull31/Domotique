@@ -14,6 +14,7 @@ bool radarOk = false;
 bool lightOn = false;
 bool autoMode = true;
 bool present = false;
+bool manual = false;  // lumière forcée depuis HA : l'auto reprend quand la pièce est vide
 unsigned long lastPresence = 0, lastSend = 0;
 bool dirty = true;
 
@@ -37,7 +38,7 @@ void setup() {
   core.addEntity("switch", "auto", "Mode automatique");
   core.onCommand([](JsonDocument& d) {
     if (d["auto"].is<bool>()) { autoMode = d["auto"]; dirty = true; }
-    if (d["light"].is<bool>()) { autoMode = false; setLight(d["light"]); }
+    if (d["light"].is<bool>()) { manual = true; setLight(d["light"]); }
   });
   core.begin();
 }
@@ -52,9 +53,13 @@ void loop() {
       lastPresence = millis();
       distance = radar.movingTargetDetected() ? radar.movingTargetDistance()
                                               : radar.stationaryTargetDistance();
+    } else {
+      distance = 0;
     }
     if (now != present) { present = now; dirty = true; }
-    if (autoMode) {
+    // Forçage manuel (ex. lumière éteinte pour dormir) respecté tant que la pièce est occupée
+    if (manual && !present && millis() - lastPresence > OFF_DELAY_MS) manual = false;
+    if (autoMode && !manual) {
       if (present) setLight(true);
       else if (millis() - lastPresence > OFF_DELAY_MS) setLight(false);
     }

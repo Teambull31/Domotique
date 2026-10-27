@@ -194,6 +194,10 @@ void DomoCore::publishDiscovery() {
       doc["payload_open"]  = "{\"" + e.key + "\":\"open\"}";
       doc["payload_close"] = "{\"" + e.key + "\":\"close\"}";
       doc["payload_stop"]  = "{\"" + e.key + "\":\"stop\"}";
+      doc["position_topic"] = _tTelemetry;
+      doc["position_template"] = "{{ value_json." + e.key + "_pos }}";
+      doc["set_position_topic"] = _tCommand;
+      doc["set_position_template"] = "{\"" + e.key + "_pos\": {{ position }} }";
     }
     if (e.extra.length()) {
       JsonDocument extra;
