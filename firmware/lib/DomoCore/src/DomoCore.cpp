@@ -187,7 +187,7 @@ bool DomoCore::waitConnected(uint32_t timeoutMs) {
 
 void DomoCore::flush(uint32_t ms) {
   unsigned long t0 = millis();
-  while (millis() - t0 < ms) { _mqtt.loop(); delay(10); }
+  while (millis() - t0 < ms) { _mqtt.loop(); delay(10); }  // NOLINT(bugprone-infinite-loop) : millis() avance
 }
 
 void DomoCore::handleMessage(byte* payload, unsigned int len) {

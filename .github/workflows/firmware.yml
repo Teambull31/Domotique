@@ -23,3 +23,7 @@ jobs:
       - run: pip install platformio
       - run: pio run -e ${{ matrix.node }}${{ matrix.board }}
         working-directory: firmware
+      - name: Analyse statique (clang-tidy)
+        if: matrix.board == ''
+        run: pio check -e ${{ matrix.node }} --skip-packages --fail-on-defect medium
+        working-directory: firmware

@@ -102,7 +102,7 @@ void loop() {
   // Sécurité : sans mesure valide (capteur muet) le relais est coupé
   float target = (enabled && !windowOpen) ? setpoint : FROST_C;
   bool want = heating;
-  if (isnan(temp)) want = false;
+  if (isnan(temp)) want = false;  // NOLINT(bugprone-branch-clone) : sécurité capteur muet, lisible à part
   else if (temp < target - HYSTERESIS) want = true;
   else if (temp > target + HYSTERESIS) want = false;
   // Anti-cycles courts (usure chaudière/relais), sauf coupure de sécurité capteur muet
