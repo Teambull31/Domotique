@@ -54,7 +54,7 @@ private:
   WiFiClient _wifi;
   PubSubClient _mqtt;
   CommandHandler _handler;
-  unsigned long _lastTry = 0;
+  unsigned long _lastTry = 0, _lastOnline = 0;
   struct Entity { String component, key, name, deviceClass, unit, extra; };
   std::vector<Entity> _entities;
 };

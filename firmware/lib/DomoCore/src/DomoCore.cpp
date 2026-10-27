@@ -132,7 +132,12 @@ bool DomoCore::connectMQTT() {
 void DomoCore::loop() {
   if (!_sleepySec) esp_task_wdt_reset();
   if (_otaOn) ArduinoOTA.handle();
-  if (WiFi.status() != WL_CONNECTED) return;  // la reconnexion WiFi est automatique
+  // La reconnexion WiFi est automatique, mais la pile WiFi de l'ESP32 reste parfois coincée
+  // (box redémarrée, changement de canal) : au-delà de 15 min sans MQTT, on redémarre.
+  // Les automatismes locaux (hors-gel, lumière auto) reprennent en quelques secondes.
+  if (_mqtt.connected()) _lastOnline = millis();
+  else if (millis() - _lastOnline > 15UL * 60UL * 1000UL) ESP.restart();
+  if (WiFi.status() != WL_CONNECTED) return;
   if (!_mqtt.connected()) {
     if (millis() - _lastTry < 5000) return;  // essai MQTT toutes les 5 s, sans bloquer
     _lastTry = millis();
