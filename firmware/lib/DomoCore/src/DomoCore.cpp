@@ -88,6 +88,7 @@ void DomoCore::begin() {
   _tTelemetry = base + "/telemetry";
   _tStatus    = base + "/status";
   _tCommand   = base + "/command";
+  _tDiag      = base + "/diag";
 
   WiFi.setHostname(_id.c_str());
   WiFi.setAutoReconnect(true);
@@ -149,6 +150,10 @@ void DomoCore::loop() {
     if (!connectMQTT()) return;
   }
   _mqtt.loop();
+  if (!_sleepySec && (_lastDiag == 0 || millis() - _lastDiag > 300000UL)) {
+    _lastDiag = millis() | 1;
+    publishDiag();
+  }
   if (_rediscover) {
     _rediscover = false;
     publishDiscovery();
@@ -238,16 +243,53 @@ void DomoCore::publishDiscovery() {
         for (JsonPair kv : extra.as<JsonObject>()) doc[kv.key()] = kv.value();
     }
 
-    JsonObject dev = doc["device"].to<JsonObject>();
-    dev["identifiers"][0] = _id;
-    dev["name"] = _id;
-    dev["suggested_area"] = _room;
-    dev["manufacturer"] = "DIY ESP32";
-    dev["model"] = _nodeType;
-
+    addDevice(doc);
     String topic = "homeassistant/" + e.component + "/" + _id + "/" + e.key + "/config";
     String payload;
     serializeJson(doc, payload);
     _mqtt.publish(topic.c_str(), payload.c_str(), true);
   }
+
+  // Diagnostic (nœuds secteur) : qualité WiFi et durée de fonctionnement, pour le dépannage à distance.
+  if (_sleepySec) return;
+  const char* diag[][4] = {{"rssi", "Signal WiFi", "signal_strength", "dBm"},
+                           {"uptime", "Fonctionne depuis", "duration", "h"}};
+  for (auto& d : diag) {
+    JsonDocument doc;
+    doc["name"] = d[1];
+    doc["unique_id"] = _id + "_" + d[0];
+    doc["has_entity_name"] = true;
+    doc["entity_category"] = "diagnostic";
+    doc["state_topic"] = _tDiag;
+    doc["availability_topic"] = _tStatus;
+    doc["value_template"] = String("{{ value_json.") + d[0] + " }}";
+    doc["device_class"] = d[2];
+    doc["unit_of_measurement"] = d[3];
+    doc["state_class"] = "measurement";
+    addDevice(doc);
+    String topic = "homeassistant/sensor/" + _id + "/" + d[0] + "/config";
+    String payload;
+    serializeJson(doc, payload);
+    _mqtt.publish(topic.c_str(), payload.c_str(), true);
+  }
+  _lastDiag = 0;  // diagnostic envoyé dès la prochaine boucle
+}
+
+void DomoCore::publishDiag() {
+  JsonDocument doc;
+  doc["rssi"] = WiFi.RSSI();
+  doc["uptime"] = roundf(millis() / 360000.0f) / 10.0f;
+  String out;
+  serializeJson(doc, out);
+  _mqtt.publish(_tDiag.c_str(), out.c_str(), true);
+}
+
+void DomoCore::addDevice(JsonDocument& doc) {
+  JsonObject dev = doc["device"].to<JsonObject>();
+  dev["identifiers"][0] = _id;
+  dev["name"] = _id;
+  dev["suggested_area"] = _room;
+  dev["manufacturer"] = "DIY ESP32";
+  dev["model"] = _nodeType;
+  dev["sw_version"] = DOMO_VERSION;
 }

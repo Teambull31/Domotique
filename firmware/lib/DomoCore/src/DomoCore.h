@@ -6,6 +6,8 @@
 #include <functional>
 #include <vector>
 
+#define DOMO_VERSION "0.3.0"  // affichée dans HA (appareil > version du logiciel)
+
 // Socle commun des nœuds : portail de configuration (WiFi/MQTT/pièce saisis au 1er démarrage,
 // stockés en flash), MQTT avec LWT, OTA, auto-découverte Home Assistant.
 // Topics : home/devices/<nœud>-<pièce>/{telemetry,status,command}
@@ -44,17 +46,19 @@ private:
   bool connectMQTT();
   void handleMessage(byte* payload, unsigned int len);
   void publishDiscovery();
+  void publishDiag();
+  void addDevice(JsonDocument& doc);
 
   String _nodeType, _id, _room = "maison";
   String _host, _user, _pass, _ota;
   bool _otaOn = false, _rediscover = false;
   uint32_t _sleepySec = 0;
   uint16_t _port = 1883;
-  String _tTelemetry, _tStatus, _tCommand;
+  String _tTelemetry, _tStatus, _tCommand, _tDiag;
   WiFiClient _wifi;
   PubSubClient _mqtt;
   CommandHandler _handler;
-  unsigned long _lastTry = 0, _lastOnline = 0;
+  unsigned long _lastTry = 0, _lastOnline = 0, _lastDiag = 0;
   struct Entity { String component, key, name, deviceClass, unit, extra; };
   std::vector<Entity> _entities;
 };
