@@ -48,7 +48,7 @@ views:
           - entity: input_boolean.senior_daily_report
             name: Bilan du soir (20 h)
           - entity: input_boolean.senior_alerts_enabled
-            name: Alertes actives (couper en cas d'absence)
+            name: Alertes actives (couper en cas d'absence ; fuite, porte la nuit et pannes restent actives)
           - entity: input_number.senior_inactivity_hours
             name: Alerte si aucune présence pendant (h)
           - entity: alert.fuite_d_eau

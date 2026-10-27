@@ -16,6 +16,9 @@ input_number:
     step: 1
     initial: 8
 input_boolean:
+  # À couper quand la personne est absente (vacances, hôpital) : coupe les alertes liées à sa présence
+  # (inactivité, cuisson, chaud/froid, porte restée ouverte, CO2). Restent TOUJOURS actives : fuite
+  # d'eau (dégâts), porte ouverte la nuit (intrusion si la maison est vide), capteurs en panne.
   senior_alerts_enabled:
     name: Alertes tranquillité actives
     initial: true
@@ -195,6 +198,7 @@ automation:
           message: "Aucune présence détectée à la maison depuis un moment. Un appel serait bienvenu."
           data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
 
+  # Toujours active, même alertes coupées : la nuit, une maison vide dont la porte s'ouvre = intrusion.
   - alias: "Senior - porte d'entrée ouverte la nuit"
     trigger:
       - platform: state
@@ -214,6 +218,10 @@ automation:
         entity_id: sensor.air_chambre_co2
         above: 1500
         for: "00:15:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.senior_alerts_enabled
+        state: "on"
     action:
       - service: notify.mobile_app_proche
         data: { title: "Air confiné", message: "CO2 élevé dans la chambre (> 1500 ppm)." }
