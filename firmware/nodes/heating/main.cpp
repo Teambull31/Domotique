@@ -33,9 +33,9 @@ void setup() {
   bmeOk = bme.begin(0x76) || bme.begin(0x77);
 
   prefs.begin("heating", false);
-  setpoint = prefs.getFloat("setpoint", 19.0f);
+  setpoint = domo::sanitize(prefs.getFloat("setpoint", 19.0f), 10, 25, 19);
   enabled = prefs.getBool("enabled", true);
-  offset = prefs.getFloat("offset", 0);
+  offset = domo::sanitize(prefs.getFloat("offset", 0), -5, 5, 0);
 
   core.addEntity("sensor", "temperature", "Température", "temperature", "°C");
   core.addEntity("sensor", "humidity", "Humidité", "humidity", "%");
@@ -57,12 +57,12 @@ void setup() {
   core.addEntity("binary_sensor", "window", "Fenêtre ouverte détectée", "window");
   core.onCommand([](JsonDocument& d) {
     if (d["setpoint"].is<float>()) {
-      setpoint = constrain((float)d["setpoint"], 10.0f, 25.0f);
+      setpoint = domo::sanitize(d["setpoint"], 10, 25, setpoint);
       prefs.putFloat("setpoint", setpoint);
     }
     if (d["enabled"].is<bool>()) { enabled = d["enabled"]; prefs.putBool("enabled", enabled); }
     if (d["temp_offset"].is<float>()) {
-      offset = constrain((float)d["temp_offset"], -5.0f, 5.0f);
+      offset = domo::sanitize(d["temp_offset"], -5, 5, offset);
       prefs.putFloat("offset", offset);
       window.reset();  // le saut de mesure ne doit pas passer pour une fenêtre ouverte
     }

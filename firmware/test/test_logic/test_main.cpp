@@ -10,6 +10,7 @@ using domo::WindowDetector;
 using domo::batteryPercent;
 using domo::shutterMoveMs;
 using domo::shutterPosition;
+using domo::sanitize;
 using domo::slug;
 
 void setUp() {}
@@ -88,6 +89,19 @@ void test_slug_tirets_uniques_et_vide() {
   TEST_ASSERT_EQUAL_STRING("maison", slug("").c_str());
 }
 
+// --- Réglages (mémoire flash / HA) ---
+void test_reglage_borne() {
+  TEST_ASSERT_EQUAL_FLOAT(25.0f, sanitize(40.0f, 10, 25, 19));
+  TEST_ASSERT_EQUAL_FLOAT(10.0f, sanitize(-3.0f, 10, 25, 19));
+  TEST_ASSERT_EQUAL_FLOAT(21.5f, sanitize(21.5f, 10, 25, 19));
+}
+void test_reglage_nan_remplace_par_defaut() { TEST_ASSERT_EQUAL_FLOAT(19.0f, sanitize(NAN, 10, 25, 19)); }
+void test_thermostat_consigne_nan_garde_le_hors_gel() {
+  // Sans garde-fou, une consigne NaN rend thermostatWant() figé : jamais de chauffe à 5 °C.
+  float target = sanitize(NAN, 10, 25, 19);
+  TEST_ASSERT_TRUE(thermostatWant(5.0f, target, 0.3f, false));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -106,5 +120,8 @@ int main() {
   RUN_TEST(test_pile_bornes);
   RUN_TEST(test_slug_accents_et_espaces);
   RUN_TEST(test_slug_tirets_uniques_et_vide);
+  RUN_TEST(test_reglage_borne);
+  RUN_TEST(test_reglage_nan_remplace_par_defaut);
+  RUN_TEST(test_thermostat_consigne_nan_garde_le_hors_gel);
   return UNITY_END();
 }

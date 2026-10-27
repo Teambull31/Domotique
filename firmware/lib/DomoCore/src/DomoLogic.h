@@ -39,6 +39,13 @@ private:
   float drop_;
 };
 
+// Réglage relu en mémoire flash ou reçu de HA : borné, et valeur par défaut si NaN
+// (une consigne NaN rendrait toutes les comparaisons fausses : plus de chauffe, même hors-gel).
+inline float sanitize(float v, float lo, float hi, float def) {
+  if (std::isnan(v)) return def;
+  return v < lo ? lo : (v > hi ? hi : v);
+}
+
 // Volet : position estimée (0 = fermé, 100 = ouvert) après `elapsedMs` de course.
 inline float shutterPosition(float startPos, unsigned long elapsedMs, unsigned long travelMs, bool opening) {
   float d = travelMs ? elapsedMs * 100.0f / travelMs : 100.0f;

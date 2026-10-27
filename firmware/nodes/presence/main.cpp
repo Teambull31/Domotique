@@ -3,6 +3,7 @@
 // Broches selon la carte : lib/DomoCore/src/DomoPins.h
 // Résilience : si Home Assistant / le WiFi tombent, le mode auto continue en local.
 #include <DomoCore.h>
+#include <DomoLogic.h>
 #include <Preferences.h>
 #include <ld2410.h>
 
@@ -38,7 +39,7 @@ void setup() {
   Serial1.begin(256000, SERIAL_8N1, PIN_UART_RX, PIN_UART_TX);
   radarOk = radar.begin(Serial1);
   prefs.begin("presence", false);
-  offMin = prefs.getFloat("off_min", 5);
+  offMin = domo::sanitize(prefs.getFloat("off_min", 5), 1, 60, 5);
 
   core.addEntity("binary_sensor", "presence", "Présence", "occupancy");
   core.addEntity("sensor", "distance", "Distance", "distance", "cm");
@@ -52,7 +53,7 @@ void setup() {
     if (d["auto"].is<bool>()) { autoMode = d["auto"]; dirty = true; }
     if (d["light"].is<bool>()) { manual = true; setLight(d["light"]); }
     if (d["off_min"].is<float>()) {
-      offMin = constrain((float)d["off_min"], 1.0f, 60.0f);
+      offMin = domo::sanitize(d["off_min"], 1, 60, offMin);
       prefs.putFloat("off_min", offMin);
       dirty = true;
     }

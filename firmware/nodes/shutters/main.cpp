@@ -43,7 +43,8 @@ void halt() {
 }
 
 void moveTo(float tgt) {
-  tgt = constrain(tgt, 0.0f, 100.0f);
+  if (isnan(tgt)) return;  // ordre invalide : ignoré
+  tgt = domo::sanitize(tgt, 0, 100, 0);
   if (pos < 0 && state == IDLE) {  // position inconnue : course complète vers la butée la plus proche
     tgt = tgt >= 50 ? 100 : 0;
     pos = 100 - tgt;
@@ -82,8 +83,9 @@ void setup() {
   digitalWrite(DOWN_PIN, LOW);
   prefs.begin("shutters", false);
   pos = prefs.getBool("moving", false) ? -1 : prefs.getFloat("pos", -1);
-  upS = prefs.getFloat("up_s", 25);
-  downS = prefs.getFloat("down_s", 25);
+  if (!(pos >= 0 && pos <= 100)) pos = -1;  // valeur invalide (ou NaN) : position inconnue
+  upS = domo::sanitize(prefs.getFloat("up_s", 25), 5, 120, 25);
+  downS = domo::sanitize(prefs.getFloat("down_s", 25), 5, 120, 25);
 
   core.addEntity("cover", "cover", "Volet", "shutter");
   const char* travelCfg = "{\"min\":5,\"max\":120,\"step\":0.5,\"mode\":\"box\",\"entity_category\":\"config\"}";
@@ -96,8 +98,8 @@ void setup() {
     else if (!strcmp(c, "stop")) halt();
     if (d["cover_pos"].is<float>()) moveTo(d["cover_pos"]);
     if (state == IDLE) {  // pas de changement de durée en pleine course (estimation faussée)
-      if (d["up_s"].is<float>()) { upS = constrain((float)d["up_s"], 5.0f, 120.0f); prefs.putFloat("up_s", upS); }
-      if (d["down_s"].is<float>()) { downS = constrain((float)d["down_s"], 5.0f, 120.0f); prefs.putFloat("down_s", downS); }
+      if (d["up_s"].is<float>()) { upS = domo::sanitize(d["up_s"], 5, 120, upS); prefs.putFloat("up_s", upS); }
+      if (d["down_s"].is<float>()) { downS = domo::sanitize(d["down_s"], 5, 120, downS); prefs.putFloat("down_s", downS); }
     }
     dirty = true;
   });

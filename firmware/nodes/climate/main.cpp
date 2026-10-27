@@ -2,6 +2,7 @@
 // Câblage : SDA=PIN_SDA, SCL=PIN_SCL, VCC=3V3, GND (broches : lib/DomoCore/src/DomoPins.h).
 #include <Adafruit_BME280.h>
 #include <DomoCore.h>
+#include <DomoLogic.h>
 #include <Preferences.h>
 
 #define SEND_INTERVAL_MS 30000
@@ -26,10 +27,10 @@ void setup() {
                  nullptr, "{\"entity_category\":\"diagnostic\"}");
   core.addEntity("number", "temp_offset", "Correction température", nullptr, "°C", "{\"min\":-5,\"max\":5,\"step\":0.1,\"mode\":\"box\",\"entity_category\":\"config\"}");
   prefs.begin("climate", false);
-  offset = prefs.getFloat("offset", 0);
+  offset = domo::sanitize(prefs.getFloat("offset", 0), -5, 5, 0);
   core.onCommand([](JsonDocument& d) {
     if (d["temp_offset"].is<float>()) {
-      offset = constrain((float)d["temp_offset"], -5.0f, 5.0f);
+      offset = domo::sanitize(d["temp_offset"], -5, 5, offset);
       prefs.putFloat("offset", offset);
       lastSend = 0;  // valeur corrigée publiée tout de suite
     }
