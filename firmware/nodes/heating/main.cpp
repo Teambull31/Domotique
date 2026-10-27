@@ -15,7 +15,7 @@ Adafruit_BME280 bme;
 Preferences prefs;
 bool bmeOk = false, enabled = true, heating = false, dirty = true;
 float setpoint = 19.0f, temp = NAN;
-unsigned long lastSend = 0;
+unsigned long lastSend = 0, lastValid = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -49,8 +49,12 @@ void loop() {
   static unsigned long lastRead = 0;
   if (bmeOk && millis() - lastRead >= 5000) {
     lastRead = millis();
-    temp = bme.readTemperature();
+    float t = bme.readTemperature();
+    // Capteur débranché = valeurs aberrantes (pas forcément NaN) : on les rejette.
+    if (t > -20.0f && t < 60.0f) { temp = t; lastValid = millis(); }
   }
+  // Plus de mesure valide depuis 2 min : on considère le capteur muet.
+  if (!isnan(temp) && millis() - lastValid > 120000UL) temp = NAN;
 
   // Sécurité : sans mesure valide (capteur muet) le relais est coupé
   float target = enabled ? setpoint : FROST_C;
