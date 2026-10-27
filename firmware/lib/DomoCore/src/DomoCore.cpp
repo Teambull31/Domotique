@@ -110,7 +110,11 @@ void DomoCore::begin() {
   _mqtt.setServer(_host.c_str(), _port);
   _mqtt.setBufferSize(1536);
   _mqtt.setKeepAlive(30);
-  _mqtt.setCallback([this](char*, byte* p, unsigned int l) { handleMessage(p, l); });
+  _mqtt.setCallback([this](char* topic, byte* p, unsigned int l) {
+    // Home Assistant redémarré : republier la discovery (après l'appel, le tampon MQTT est partagé)
+    if (!strcmp(topic, "homeassistant/status")) _rediscover = (l == 6 && !memcmp(p, "online", 6));
+    else handleMessage(p, l);
+  });
 }
 
 bool DomoCore::connectMQTT() {
@@ -125,6 +129,7 @@ bool DomoCore::connectMQTT() {
   }
   _mqtt.publish(_tStatus.c_str(), "online", true);
   _mqtt.subscribe(_tCommand.c_str());
+  if (!_sleepySec) _mqtt.subscribe("homeassistant/status");
   publishDiscovery();
   return true;
 }
@@ -144,6 +149,10 @@ void DomoCore::loop() {
     if (!connectMQTT()) return;
   }
   _mqtt.loop();
+  if (_rediscover) {
+    _rediscover = false;
+    publishDiscovery();
+  }
 }
 
 bool DomoCore::waitConnected(uint32_t timeoutMs) {

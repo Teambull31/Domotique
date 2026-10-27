@@ -47,7 +47,7 @@ private:
 
   String _nodeType, _id, _room = "maison";
   String _host, _user, _pass, _ota;
-  bool _otaOn = false;
+  bool _otaOn = false, _rediscover = false;
   uint32_t _sleepySec = 0;
   uint16_t _port = 1883;
   String _tTelemetry, _tStatus, _tCommand;
