@@ -10,6 +10,7 @@
 #define HYSTERESIS 0.3f
 #define FROST_C 7.0f
 #define SEND_INTERVAL_MS 30000
+#define MIN_CYCLE_MS (3UL * 60UL * 1000UL)  // chaudière : pas de marche/arrêt à moins de 3 min
 #define WINDOW_DROP_C 1.0f
 #define WINDOW_PAUSE_MS (30UL * 60UL * 1000UL)
 
@@ -18,7 +19,8 @@ Adafruit_BME280 bme;
 Preferences prefs;
 bool bmeOk = false, enabled = true, heating = false, dirty = true;
 float setpoint = 19.0f, temp = NAN;
-unsigned long lastSend = 0, lastValid = 0, windowSince = 0;
+unsigned long lastSend = 0, lastValid = 0, windowSince = 0, lastSwitch = 0;
+bool switchedOnce = false;
 bool windowOpen = false;
 float history[6];  // une mesure par minute sur 5 min
 int histCount = 0;
@@ -96,8 +98,12 @@ void loop() {
   if (isnan(temp)) want = false;
   else if (temp < target - HYSTERESIS) want = true;
   else if (temp > target + HYSTERESIS) want = false;
-  if (want != heating) {
+  // Anti-cycles courts (usure chaudière/relais), sauf coupure de sécurité capteur muet
+  bool cycleOk = !switchedOnce || millis() - lastSwitch >= MIN_CYCLE_MS || isnan(temp);
+  if (want != heating && cycleOk) {
     heating = want;
+    lastSwitch = millis();
+    switchedOnce = true;
     digitalWrite(RELAY_PIN, heating ? HIGH : LOW);
     dirty = true;
   }
