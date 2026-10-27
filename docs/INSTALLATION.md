@@ -33,8 +33,9 @@
 ## 5. Alertes « tranquillité »
 - [ ] Copier `homeassistant/packages/senior_care.yaml` dans `/config/packages/` et l'adapter au site :
       les **groupes** en tête du fichier (une liste par type de capteur : radars, sondes de fuite, piles,
-      défauts, températures), puis la porte d'entrée, le CO2 de la chambre et la puissance de cuisson ; vérifier (`homeassistant/check_config.sh` ou Outils de développement >
-      Vérifier la configuration), redémarrer HA.
+      défauts, températures), puis la porte d'entrée, le CO2 de la chambre et la puissance de cuisson.
+- [ ] Vérifier (`homeassistant/check_config.sh` et `python homeassistant/test_templates.py`, ou Outils
+      de développement > Vérifier la configuration), puis redémarrer HA.
 - [ ] Tableau de bord du proche : copier `homeassistant/dashboards/tranquillite.yaml` dans
       `/config/dashboards/` et l'enregistrer (bloc `lovelace:` en tête du fichier), adapter les `entity_id`.
 - [ ] Lancer le script **Tester les alertes du proche** : les 2 notifications arrivent, la 2ᵉ sonne
