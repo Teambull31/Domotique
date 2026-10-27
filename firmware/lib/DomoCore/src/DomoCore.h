@@ -5,6 +5,7 @@
 #include <ArduinoJson.h>
 #include <functional>
 #include <vector>
+#include "DomoPins.h"
 
 #define DOMO_VERSION "0.3.0"  // affichée dans HA (appareil > version du logiciel)
 

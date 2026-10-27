@@ -1,5 +1,5 @@
 // Nœud "power" : tension / courant / puissance / énergie / fréquence (PZEM-004T v3, UART2).
-// PZEM : TX -> GPIO16 (RX2), RX -> GPIO17 (TX2). Le PZEM mesure du 230 V : installation au tableau
+// PZEM : TX -> PIN_UART_RX, RX -> PIN_UART_TX (broches : lib/DomoCore/src/DomoPins.h). Le PZEM mesure du 230 V : installation au tableau
 // par un électricien, pince fournie (non invasive), ESP32 alimenté en 5 V TBTS séparé.
 #include <DomoCore.h>
 #include <PZEM004Tv30.h>
@@ -7,7 +7,7 @@
 #define SEND_INTERVAL_MS 10000
 
 DomoCore core("power");
-PZEM004Tv30 pzem(Serial2, 16, 17);
+PZEM004Tv30 pzem(Serial1, PIN_UART_RX, PIN_UART_TX);
 unsigned long lastSend = 0;
 
 void setup() {

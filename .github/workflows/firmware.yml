@@ -11,6 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         node: [climate, air, power, door, leak, presence, shutters, heating]
+        board: ['', '-c3', '-s3']   # ESP32-DevKitC, ESP32-C3, ESP32-S3
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -20,5 +21,5 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
       - run: pip install platformio
-      - run: pio run -e ${{ matrix.node }}
+      - run: pio run -e ${{ matrix.node }}${{ matrix.board }}
         working-directory: firmware

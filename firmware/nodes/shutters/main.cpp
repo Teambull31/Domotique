@@ -1,13 +1,13 @@
 // Nœud "shutters" : un volet roulant filaire (2 relais montée/descente, interverrouillés).
-// Relais : MONTEE=GPIO26, DESCENTE=GPIO27. À raccorder par un électricien (230 V) avec carte
+// Relais : MONTEE=PIN_RELAY1, DESCENTE=PIN_RELAY2 (broches : lib/DomoCore/src/DomoPins.h). À raccorder par un électricien (230 V) avec carte
 // relais à isolation renforcée ; ne jamais piloter les deux sens simultanément (logiciel + câblage).
 // Position estimée au temps de course (0 = fermé, 100 = ouvert), mémorisée à chaque arrêt.
 // Aller en butée (0 ou 100) prolonge la course pour recaler l'estimation.
 #include <DomoCore.h>
 #include <Preferences.h>
 
-#define UP_PIN 26
-#define DOWN_PIN 27
+#define UP_PIN PIN_RELAY1
+#define DOWN_PIN PIN_RELAY2
 #define TRAVEL_MS 25000UL   // durée de course complète, à mesurer sur place
 #define OVERRUN_MS 2000UL   // dépassement en butée pour se recaler
 #define DEAD_TIME_MS 500UL  // pause obligatoire à l'inversion

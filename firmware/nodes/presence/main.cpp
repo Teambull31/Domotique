@@ -1,10 +1,11 @@
 // Nœud "presence" : radar mmWave LD2410 (détecte aussi une personne immobile) + relais éclairage.
-// LD2410 : TX -> GPIO16 (RX2), RX -> GPIO17 (TX2), alim 5 V.  Relais lumière : GPIO26.
+// LD2410 : TX -> PIN_UART_RX, RX -> PIN_UART_TX, alim 5 V.  Relais lumière : PIN_RELAY1.
+// Broches selon la carte : lib/DomoCore/src/DomoPins.h
 // Résilience : si Home Assistant / le WiFi tombent, le mode auto continue en local.
 #include <DomoCore.h>
 #include <ld2410.h>
 
-#define RELAY_PIN 26
+#define RELAY_PIN PIN_RELAY1
 #define OFF_DELAY_MS (5UL * 60UL * 1000UL)  // extinction 5 min après la dernière présence
 #define SEND_INTERVAL_MS 30000
 
@@ -29,8 +30,8 @@ void setup() {
   Serial.begin(115200);
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
-  Serial2.begin(256000, SERIAL_8N1, 16, 17);
-  radarOk = radar.begin(Serial2);
+  Serial1.begin(256000, SERIAL_8N1, PIN_UART_RX, PIN_UART_TX);
+  radarOk = radar.begin(Serial1);
 
   core.addEntity("binary_sensor", "presence", "Présence", "occupancy");
   core.addEntity("sensor", "distance", "Distance", "distance", "cm");

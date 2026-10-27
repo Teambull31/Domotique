@@ -33,10 +33,10 @@ void DomoCore::begin() {
   Preferences prefs;
   prefs.begin("domo", false);
 
-  pinMode(0, INPUT_PULLUP);
-  if (digitalRead(0) == LOW) {
+  pinMode(PIN_BOOT, INPUT_PULLUP);
+  if (digitalRead(PIN_BOOT) == LOW) {
     delay(3000);
-    if (digitalRead(0) == LOW) {
+    if (digitalRead(PIN_BOOT) == LOW) {
       prefs.clear();
       WiFiManager().resetSettings();
       Serial.println("Configuration effacée");

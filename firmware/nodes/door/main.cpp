@@ -1,11 +1,11 @@
 // Nœud "door" : contact d'ouverture porte/fenêtre sur pile (deep sleep).
-// Contact reed entre GPIO33 et GND (fermé = porte fermée = broche à 0).
-// Diviseur 2x100k de la pile vers GPIO34 (mesure batterie).
+// Contact reed entre PIN_WAKE et GND (fermé = porte fermée = broche à 0).
+// Diviseur 2x100k de la pile vers PIN_BATTERY. Broches selon la carte : lib/DomoCore/src/DomoPins.h
 #include <DomoCore.h>
 #include <DomoSleep.h>
 
-#define CONTACT_PIN GPIO_NUM_33
-#define BATTERY_ADC 34
+#define CONTACT_PIN PIN_WAKE
+#define BATTERY_ADC PIN_BATTERY
 #define HEARTBEAT_SEC 3600
 
 DomoCore core("door");

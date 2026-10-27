@@ -5,7 +5,7 @@
 #include <DomoCore.h>
 #include <Preferences.h>
 
-#define RELAY_PIN 25
+#define RELAY_PIN PIN_RELAY_HEAT  // broches : lib/DomoCore/src/DomoPins.h
 #define HYSTERESIS 0.3f
 #define FROST_C 7.0f
 #define SEND_INTERVAL_MS 30000
@@ -21,6 +21,7 @@ void setup() {
   Serial.begin(115200);
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
+  Wire.begin(PIN_SDA, PIN_SCL);
   bmeOk = bme.begin(0x76) || bme.begin(0x77);
 
   prefs.begin("heating", false);

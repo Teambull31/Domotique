@@ -1,5 +1,5 @@
 // Nœud "climate" : température / humidité / pression (BME280, I2C).
-// Câblage : SDA=GPIO21, SCL=GPIO22, VCC=3V3, GND.
+// Câblage : SDA=PIN_SDA, SCL=PIN_SCL, VCC=3V3, GND (broches : lib/DomoCore/src/DomoPins.h).
 #include <Adafruit_BME280.h>
 #include <DomoCore.h>
 
@@ -12,6 +12,7 @@ unsigned long lastSend = 0;
 
 void setup() {
   Serial.begin(115200);
+  Wire.begin(PIN_SDA, PIN_SCL);
   bmeOk = bme.begin(0x76) || bme.begin(0x77);
   if (!bmeOk) Serial.println("BME280 introuvable");
 

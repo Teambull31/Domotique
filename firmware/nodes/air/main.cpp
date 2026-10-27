@@ -1,5 +1,6 @@
 // Nœud "air" : CO2 + température + humidité (SCD40, I2C) et particules PM1/2.5/10 (PMS5003, UART2).
-// SCD40 : SDA=GPIO21, SCL=GPIO22.  PMS5003 : TX capteur -> GPIO16 (RX2), alim 5 V.
+// SCD40 : I2C PIN_SDA/PIN_SCL.  PMS5003 : TX capteur -> PIN_UART_RX, alim 5 V.
+// Broches selon la carte : lib/DomoCore/src/DomoPins.h
 #include <Adafruit_PM25AQI.h>
 #include <DomoCore.h>
 #include <SensirionI2CScd4x.h>
@@ -15,13 +16,13 @@ unsigned long lastSend = 0;
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin();
+  Wire.begin(PIN_SDA, PIN_SCL);
   scd4x.begin(Wire);
   scd4x.stopPeriodicMeasurement();
   scd4x.startPeriodicMeasurement();
 
-  Serial2.begin(9600, SERIAL_8N1, 16, 17);
-  pmsOk = pms.begin_UART(&Serial2);
+  Serial1.begin(9600, SERIAL_8N1, PIN_UART_RX, PIN_UART_TX);
+  pmsOk = pms.begin_UART(&Serial1);
 
   core.addEntity("sensor", "co2", "CO2", "carbon_dioxide", "ppm");
   core.addEntity("sensor", "temperature", "Température", "temperature", "°C");
