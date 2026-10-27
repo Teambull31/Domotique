@@ -43,6 +43,33 @@ template:
           {% endfor %}
           {{ ns.active }}
 
+  - binary_sensor:
+      - name: "Fuite d'eau quelque part"
+        unique_id: senior_fuite_quelque_part
+        device_class: moisture
+        state: >
+          {{ expand(['binary_sensor.leak_cuisine_fuite', 'binary_sensor.leak_salle_de_bain_fuite'])
+             | selectattr('state', 'eq', 'on') | list | count > 0 }}
+
+# Fuite : alerte immédiate, rappels 5 min puis 15 min après, puis toutes les 30 min, tant que l'eau est là et que le proche n'a pas
+# acquitté (Paramètres > Entités > alert.fuite_d_eau > Acquitter, ou carte du tableau de bord).
+alert:
+  fuite_d_eau:
+    name: Fuite d'eau
+    entity_id: binary_sensor.fuite_d_eau_quelque_part
+    state: "on"
+    repeat: [5, 15, 30]
+    can_acknowledge: true
+    skip_first: false
+    title: "Fuite d'eau"
+    message: >
+      De l'eau est détectée :
+      {{ expand(['binary_sensor.leak_cuisine_fuite', 'binary_sensor.leak_salle_de_bain_fuite'])
+         | selectattr('state', 'eq', 'on') | map(attribute='name') | join(', ') }}.
+    done_message: "Fuite d'eau : plus d'eau détectée."
+    notifiers: [mobile_app_proche]
+    data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
+
 automation:
   - alias: "Senior - aucune activité pendant la journée"
     trigger:
@@ -81,15 +108,6 @@ automation:
     action:
       - service: notify.mobile_app_proche
         data: { title: "Porte d'entrée ouverte", message: "La porte d'entrée vient de s'ouvrir en pleine nuit.", data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } } }
-
-  - alias: "Senior - fuite d'eau"
-    trigger:
-      - platform: state
-        entity_id: [binary_sensor.leak_cuisine_fuite, binary_sensor.leak_salle_de_bain_fuite]
-        to: "on"
-    action:
-      - service: notify.mobile_app_proche
-        data: { title: "Fuite d'eau", message: "{{ trigger.to_state.name }} : de l'eau détectée.", data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } } }
 
   - alias: "Senior - CO2 élevé, aérer"
     trigger:
