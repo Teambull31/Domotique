@@ -9,6 +9,7 @@
 DomoCore core("power");
 PZEM004Tv30 pzem(Serial1, PIN_UART_RX, PIN_UART_TX);
 unsigned long lastSend = 0;
+int failures = 0;  // lectures PZEM ratées d'affilée (une erreur isolée sur le bus est normale)
 
 void setup() {
   Serial.begin(115200);
@@ -18,6 +19,8 @@ void setup() {
   core.addEntity("sensor", "energy", "Énergie", "energy", "kWh");
   core.addEntity("sensor", "frequency", "Fréquence", "frequency", "Hz");
   core.addEntity("sensor", "pf", "Facteur de puissance", "power_factor", nullptr);
+  core.addEntity("binary_sensor", "sensor_fault", "Défaut capteur", "problem",
+                 nullptr, "{\"entity_category\":\"diagnostic\"}");
   core.begin();
 }
 
@@ -27,8 +30,18 @@ void loop() {
   lastSend = millis();
 
   float v = pzem.voltage();
-  if (isnan(v)) return;  // PZEM muet : on ne publie rien plutôt que des zéros trompeurs
+  failures = isnan(v) ? failures + 1 : 0;
+  if (isnan(v) && failures < 3) return;  // erreur isolée : on attend la lecture suivante
   JsonDocument doc;
+  // PZEM muet 30 s : valeurs à null ("inconnu" dans HA) plutôt que la dernière puissance retenue,
+  // qui ferait croire à une plaque de cuisson restée allumée (ou éteinte).
+  if (isnan(v)) {
+    for (const char* k : {"voltage", "current", "power", "energy", "frequency", "pf"}) doc[k] = nullptr;
+    doc["sensor_fault"] = true;
+    core.publishTelemetry(doc);
+    return;
+  }
+  doc["sensor_fault"] = false;
   doc["voltage"] = v;
   doc["current"] = pzem.current();
   doc["power"] = pzem.power();

@@ -156,7 +156,8 @@ automation:
                     binary_sensor.presence_cuisine_defaut_radar,
                     # sonde de température morte : thermostat coupé par sécurité, alerte chaud/froid aveugle
                     binary_sensor.heating_salon_defaut_capteur, binary_sensor.climate_salon_defaut_capteur,
-                    binary_sensor.climate_chambre_defaut_capteur]
+                    binary_sensor.climate_chambre_defaut_capteur,
+                    binary_sensor.power_cuisson_defaut_capteur, binary_sensor.air_chambre_defaut_capteur]
         to: "on"
         for: "00:10:00"
     action:

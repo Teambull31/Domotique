@@ -16,7 +16,8 @@ SensirionI2CScd4x scd4x;
 Adafruit_PM25AQI pms;
 bool pmsOk = false, pmAwake = false, pmFlushed = false, havePm = false;
 uint16_t pm1 = 0, pm25 = 0, pm10 = 0;
-unsigned long lastSend = 0, pmWakeAt = 0, pmSleptAt = 0;
+unsigned long lastSend = 0, pmWakeAt = 0, pmSleptAt = 0, lastPmAt = 0;
+int scdFailures = 0;
 
 void pmsCommand(bool wake) {
   const uint8_t cmd[] = {0x42, 0x4D, 0xE4, 0x00, (uint8_t)wake, 0x01, (uint8_t)(wake ? 0x74 : 0x73)};
@@ -43,6 +44,8 @@ void setup() {
   core.addEntity("sensor", "pm1", "PM1", "pm1", "µg/m³");
   core.addEntity("sensor", "pm25", "PM2.5", "pm25", "µg/m³");
   core.addEntity("sensor", "pm10", "PM10", "pm10", "µg/m³");
+  core.addEntity("binary_sensor", "sensor_fault", "Défaut capteur", "problem",
+                 nullptr, "{\"entity_category\":\"diagnostic\"}");
   core.begin();
 }
 
@@ -62,6 +65,7 @@ void loop() {
         pm25 = d.pm25_env;
         pm10 = d.pm100_env;
         havePm = true;
+        lastPmAt = millis();
         pmsCommand(false);
       } else if (millis() - pmWakeAt > PM_WARMUP_MS + 10000) {
         pmsCommand(false);  // pas de trame valide : on réessaiera au prochain cycle
@@ -70,20 +74,27 @@ void loop() {
   }
 
   if (millis() - lastSend < SEND_INTERVAL_MS) return;
+  lastSend = millis();
+  // Mesure absente ou trop ancienne : null ("inconnu" dans HA) plutôt que la dernière valeur
+  // retenue, sur laquelle l'alerte "air confiné" se baserait.
   JsonDocument doc;
+  for (const char* k : {"co2", "temperature", "humidity", "pm1", "pm25", "pm10"}) doc[k] = nullptr;
   uint16_t co2 = 0;
   float t = 0, h = 0;
-  if (scd4x.readMeasurement(co2, t, h) == 0 && co2 != 0) {
+  bool scdOk = scd4x.readMeasurement(co2, t, h) == 0 && co2 != 0;
+  scdFailures = scdOk ? 0 : scdFailures + 1;
+  if (scdOk) {
     doc["co2"] = co2;
     doc["temperature"] = roundf(t * 10) / 10.0;
     doc["humidity"] = roundf(h * 10) / 10.0;
   }
-  if (havePm) {  // dernière mesure de particules (valable 5 min)
+  bool pmFresh = havePm && millis() - lastPmAt < 3 * PM_PERIOD_MS;  // 3 cycles manqués = périmé
+  if (pmFresh) {
     doc["pm1"] = pm1;
     doc["pm25"] = pm25;
     doc["pm10"] = pm10;
   }
-  if (doc.size() == 0) return;  // pas encore de mesure valide : réessayer au prochain tour
-  lastSend = millis();
+  // Défaut : SCD40 muet 90 s, ou PMS5003 sans mesure depuis 15 min (hors démarrage)
+  doc["sensor_fault"] = scdFailures >= 3 || (!pmFresh && millis() > 3 * PM_PERIOD_MS);
   core.publishTelemetry(doc);
 }
