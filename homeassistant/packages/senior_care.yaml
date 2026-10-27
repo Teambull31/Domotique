@@ -101,7 +101,7 @@ automation:
       - platform: state
         entity_id: [binary_sensor.door_entree_ouverture, binary_sensor.leak_cuisine_fuite]
         to: unavailable
-        for: "03:00:00"
+        for: "01:00:00"  # + expire_after (2 h 05) côté capteur ≈ 3 h sans nouvelles
     action:
       - service: notify.mobile_app_proche
         data: { title: "Capteur à vérifier", message: "{{ trigger.to_state.name }} : batterie faible ou hors ligne." }

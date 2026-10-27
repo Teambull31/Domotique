@@ -18,6 +18,10 @@ public:
   // Bloquant au 1er démarrage (portail "Domo-<nœud>-setup"). Maintenir BOOT (GPIO0)
   // 3 s au démarrage efface la configuration.
   void begin();
+  // Nœud sur pile (deep sleep) : à appeler avant begin(). Pas de LWT (sinon HA verrait le nœud
+  // "hors ligne" à chaque sommeil) mais expire_after ; télémétrie retenue ; une fois configuré,
+  // jamais de portail si le WiFi est absent (on se rendort au lieu de vider la pile).
+  void setSleepy(uint32_t heartbeatSec) { _sleepySec = heartbeatSec; }
   void loop();
 
   // Déclare une entité Home Assistant (MQTT discovery), à appeler avant begin().
@@ -44,6 +48,7 @@ private:
   String _nodeType, _id, _room = "maison";
   String _host, _user, _pass, _ota;
   bool _otaOn = false;
+  uint32_t _sleepySec = 0;
   uint16_t _port = 1883;
   String _tTelemetry, _tStatus, _tCommand;
   WiFiClient _wifi;

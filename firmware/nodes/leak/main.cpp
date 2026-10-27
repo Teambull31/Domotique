@@ -15,6 +15,7 @@ void setup() {
   pinMode(PROBE_PIN, INPUT);
   core.addEntity("binary_sensor", "wet", "Fuite", "moisture");
   core.addEntity("sensor", "battery", "Batterie", "battery", "%");
+  core.setSleepy(HEARTBEAT_SEC);
   core.begin();
 
   int level = digitalRead(PROBE_PIN);

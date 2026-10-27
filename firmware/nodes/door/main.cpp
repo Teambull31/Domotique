@@ -15,6 +15,7 @@ void setup() {
   pinMode(CONTACT_PIN, INPUT_PULLUP);
   core.addEntity("binary_sensor", "open", "Ouverture", "door");
   core.addEntity("sensor", "battery", "Batterie", "battery", "%");
+  core.setSleepy(HEARTBEAT_SEC);
   core.begin();
 
   int level = digitalRead(CONTACT_PIN);  // HIGH = contact écarté = ouvert

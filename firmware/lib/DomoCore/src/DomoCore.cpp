@@ -61,9 +61,13 @@ void DomoCore::begin() {
   bool save = false;
   wm.setSaveParamsCallback([&] { save = true; });
   wm.setConfigPortalTimeout(300);
+  if (_sleepySec && !_host.isEmpty()) {  // déjà configuré : pas de portail sur pile
+    wm.setEnableConfigPortal(false);
+    wm.setConnectTimeout(15);
+  }
 
   String ap = "Domo-" + _nodeType + "-setup";
-  if (!wm.autoConnect(ap.c_str())) ESP.restart();
+  if (!wm.autoConnect(ap.c_str()) && !_sleepySec) ESP.restart();
 
   if (save) {
     prefs.putString("room", pRoom.getValue());
@@ -102,7 +106,9 @@ bool DomoCore::connectMQTT() {
   if (_host.isEmpty()) return false;
   const char* user = _user.length() ? _user.c_str() : nullptr;
   const char* pass = _pass.length() ? _pass.c_str() : nullptr;
-  if (!_mqtt.connect(_id.c_str(), user, pass, _tStatus.c_str(), 1, true, "offline")) {
+  bool ok = _sleepySec ? _mqtt.connect(_id.c_str(), user, pass)
+                       : _mqtt.connect(_id.c_str(), user, pass, _tStatus.c_str(), 1, true, "offline");
+  if (!ok) {
     Serial.printf("MQTT rc=%d\n", _mqtt.state());
     return false;
   }
@@ -149,7 +155,7 @@ bool DomoCore::publishTelemetry(JsonDocument& doc) {
   doc["room"] = _room;
   String out;
   serializeJson(doc, out);
-  return _mqtt.publish(_tTelemetry.c_str(), out.c_str());
+  return _mqtt.publish(_tTelemetry.c_str(), out.c_str(), _sleepySec > 0);  // retenu si sur pile
 }
 
 void DomoCore::addEntity(const char* component, const char* key, const char* name,
@@ -165,7 +171,8 @@ void DomoCore::publishDiscovery() {
     doc["unique_id"] = _id + "_" + e.key;
     doc["has_entity_name"] = true;
     doc["state_topic"] = _tTelemetry;
-    doc["availability_topic"] = _tStatus;
+    if (_sleepySec) doc["expire_after"] = _sleepySec * 2 + 300;  // 2 battements manqués
+    else doc["availability_topic"] = _tStatus;
     doc["value_template"] = "{{ value_json." + e.key + " }}";
     if (e.deviceClass.length()) doc["device_class"] = e.deviceClass;
     if (e.unit.length()) doc["unit_of_measurement"] = e.unit;
