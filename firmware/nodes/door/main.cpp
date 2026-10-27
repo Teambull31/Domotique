@@ -16,12 +16,12 @@ void setup() {
   delay(20);  // rebonds du contact reed
   // Lu AVANT la connexion WiFi (2 à 5 s) : une porte ouverte puis vite refermée doit être signalée.
   int level = digitalRead(CONTACT_PIN);  // HIGH = contact écarté = ouvert
+  float battery = roundf(domoBatteryPercent(BATTERY_ADC));  // avant le WiFi (chute de tension)
   core.addEntity("binary_sensor", "open", "Ouverture", "door");
   core.addEntity("sensor", "battery", "Batterie", "battery", "%");
   core.setSleepy(HEARTBEAT_SEC);
   core.begin();
 
-  float battery = roundf(domoBatteryPercent(BATTERY_ADC));
   if (core.waitConnected(15000)) {
     JsonDocument doc;
     doc["open"] = (level == HIGH);

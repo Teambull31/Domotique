@@ -25,7 +25,10 @@ inline void domoDeepSleep(gpio_num_t pin, int currentLevel, uint64_t heartbeatSe
 }
 
 // Niveau de pile (%) via diviseur 1/2 sur une entrée ADC (Li-ion 3,3 V..4,2 V).
+// À lire avant d'allumer le WiFi : les pics d'émission font chuter la tension. Moyenne de 8 mesures.
 inline float domoBatteryPercent(uint8_t adcPin) {
-  float v = analogReadMilliVolts(adcPin) * 2 / 1000.0f;
+  uint32_t mv = 0;
+  for (int i = 0; i < 8; i++) mv += analogReadMilliVolts(adcPin);
+  float v = mv / 8 * 2 / 1000.0f;
   return constrain((v - 3.3f) / (4.2f - 3.3f) * 100.0f, 0.0f, 100.0f);
 }

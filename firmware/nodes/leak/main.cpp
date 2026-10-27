@@ -20,6 +20,7 @@ void setup() {
     delay(300);
     level = digitalRead(PROBE_PIN);
   }
+  float battery = roundf(domoBatteryPercent(BATTERY_ADC));  // avant le WiFi (chute de tension)
   core.addEntity("binary_sensor", "wet", "Fuite", "moisture");
   core.addEntity("sensor", "battery", "Batterie", "battery", "%");
   core.setSleepy(HEARTBEAT_SEC);
@@ -27,7 +28,7 @@ void setup() {
 
   JsonDocument doc;
   doc["wet"] = (level == HIGH);
-  doc["battery"] = roundf(domoBatteryPercent(BATTERY_ADC));
+  doc["battery"] = battery;
   if (core.waitConnected(15000)) {
     core.publishTelemetry(doc);
     core.flush();
