@@ -34,13 +34,23 @@ void DomoCore::begin() {
   Preferences prefs;
   prefs.begin("domo", false);
 
-  pinMode(PIN_BOOT, INPUT_PULLUP);
-  if (digitalRead(PIN_BOOT) == LOW) {
-    delay(3000);
-    if (digitalRead(PIN_BOOT) == LOW) {
+  // Bouton BOOT, à presser dans les 2 s qui suivent la mise sous tension (pressé pendant le reset,
+  // l'ESP32 passe en mode téléchargement) : 3 s = portail de configuration (valeurs conservées),
+  // 10 s = effacement complet. Pas de fenêtre d'attente au réveil d'un nœud sur pile.
+  bool forcePortal = false;
+  if (esp_reset_reason() != ESP_RST_DEEPSLEEP) {
+    pinMode(PIN_BOOT, INPUT_PULLUP);
+    unsigned long t0 = millis();
+    while (millis() - t0 < 2000 && digitalRead(PIN_BOOT) == HIGH) delay(10);
+    unsigned long p0 = millis();
+    while (digitalRead(PIN_BOOT) == LOW && millis() - p0 < 10000) delay(10);
+    unsigned long held = millis() - p0;
+    if (held >= 10000) {
       prefs.clear();
       WiFiManager().resetSettings();
       Serial.println("Configuration effacée");
+    } else if (held >= 3000) {
+      forcePortal = true;
     }
   }
 
@@ -62,19 +72,31 @@ void DomoCore::begin() {
   WiFiManagerParameter pHost("host", "Adresse MQTT (IP de Home Assistant)", _host.c_str(), 64);
   WiFiManagerParameter pPort("port", "Port MQTT", portBuf, 6);
   WiFiManagerParameter pUser("user", "Utilisateur MQTT", _user.c_str(), 32);
-  WiFiManagerParameter pPass("pass", "Mot de passe MQTT", _pass.c_str(), 64);
-  WiFiManagerParameter pOta("ota", "Mot de passe OTA (vide = mise à jour WiFi désactivée)", _ota.c_str(), 32);
+  // Mots de passe jamais pré-remplis (le portail est un point d'accès ouvert) : vide = inchangé.
+  WiFiManagerParameter pPass("pass", "Mot de passe MQTT (vide = inchangé)", "", 64);
+  WiFiManagerParameter pOta("ota", "Mot de passe OTA, 8 caractères min. (vide = inchangé ; "
+                            "jamais défini = mise à jour WiFi désactivée)", "", 32);
   for (auto* p : {&pRoom, &pLabel, &pHost, &pPort, &pUser, &pPass, &pOta}) wm.addParameter(p);
   bool save = false;
   wm.setSaveParamsCallback([&] { save = true; });
   wm.setConfigPortalTimeout(300);
-  if (_sleepySec && !_host.isEmpty()) {  // déjà configuré : pas de portail sur pile
-    wm.setEnableConfigPortal(false);
-    wm.setConnectTimeout(15);
-  }
-
   String ap = "Domo-" + _nodeType + "-setup";
-  if (!wm.autoConnect(ap.c_str()) && !_sleepySec) ESP.restart();
+  if (forcePortal) {
+    wm.startConfigPortal(ap.c_str());
+    if (!save) ESP.restart();  // portail fermé sans enregistrer : démarrage normal
+  } else {
+    // Déjà configuré : jamais de portail automatique. Box redémarrée après une coupure (plus lente
+    // que l'ESP32) ou en panne : le nœud continue ses automatismes locaux (hors-gel, lumière auto)
+    // et le WiFi se reconnecte tout seul dès qu'il revient.
+    if (!_host.isEmpty()) {
+      wm.setEnableConfigPortal(false);
+      wm.setConnectTimeout(_sleepySec ? 15 : 20);
+    }
+    if (!wm.autoConnect(ap.c_str())) {
+      if (_host.isEmpty() && !_sleepySec) ESP.restart();  // jamais configuré : portail au redémarrage
+      if (!_host.isEmpty()) WiFi.begin();  // identifiants enregistrés : reconnexion en arrière-plan
+    }
+  }
 
   if (save) {
     prefs.putString("room", pRoom.getValue());
@@ -83,8 +105,8 @@ void DomoCore::begin() {
     int port = atoi(pPort.getValue());
     prefs.putUShort("port", (port > 0 && port < 65536) ? port : 1883);
     prefs.putString("user", pUser.getValue());
-    prefs.putString("pass", pPass.getValue());
-    prefs.putString("ota", pOta.getValue());
+    if (strlen(pPass.getValue())) prefs.putString("pass", pPass.getValue());
+    if (strlen(pOta.getValue())) prefs.putString("ota", pOta.getValue());
     ESP.restart();  // recharge proprement avec la config enregistrée
   }
 

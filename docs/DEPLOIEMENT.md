@@ -10,7 +10,7 @@ Checklist pas à pas d'une installation : [`INSTALLATION.md`](INSTALLATION.md).
 - **Accès à distance pour toi** (support) : Tailscale ou Nabu Casa, avec l'accord de la personne.
 - **Tout est configuré sur place, sans recompiler** : à la première mise sous tension, un nœud ouvre un
   WiFi `Domo-<nœud>-setup` (portail captif) où on saisit WiFi, IP du broker MQTT, pièce, mot de passe OTA.
-  BOOT maintenu 3 s au démarrage = remise à zéro.
+  Reconfigurer : BOOT pressé dans les 2 s après la mise sous tension, 3 s = portail, 10 s = remise à zéro.
 - Les mises à jour se font par WiFi (OTA) si un mot de passe de 8+ caractères a été saisi ; sinon OTA désactivée.
 - **Broker MQTT du site : toujours avec utilisateur/mot de passe** (jamais `allow_anonymous true` hors réseau de test).
 

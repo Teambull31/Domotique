@@ -18,8 +18,8 @@ public:
 
   explicit DomoCore(const char* nodeType);
 
-  // Bloquant au 1er démarrage (portail "Domo-<nœud>-setup"). Maintenir BOOT (GPIO0)
-  // 3 s au démarrage efface la configuration.
+  // Bloquant au 1er démarrage (portail "Domo-<nœud>-setup"). Ensuite, jamais de portail automatique.
+  // BOOT pressé dans les 2 s après la mise sous tension : 3 s = portail, 10 s = effacement complet.
   void begin();
   // Nœud sur pile (deep sleep) : à appeler avant begin(). Pas de LWT (sinon HA verrait le nœud
   // "hors ligne" à chaque sommeil) mais expire_after ; télémétrie retenue ; une fois configuré,

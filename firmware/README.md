@@ -25,7 +25,7 @@ Chaque nœud existe pour 3 cartes : `<nœud>` (ESP32-DevKitC), `<nœud>-c3` (ESP
 | Relais chauffage | 25 | 0 | 4 |
 | Contact porte / sonde fuite (réveil) | 33 | 3 | 6 |
 | Mesure pile (ADC) | 34 | 1 | 7 |
-| Bouton BOOT (reset config) | 0 | 9 | 0 |
+| Bouton BOOT (configuration) | 0 | 9 | 0 |
 
 Source : `lib/DomoCore/src/DomoPins.h`. Sur C3, le réveil deep sleep n'est possible que sur GPIO0..5 et le
 pull-up interne n'est pas garanti en sommeil : ajouter 100 kΩ entre la broche de réveil et 3V3.
@@ -37,7 +37,11 @@ le DevKitC pour `air`, `presence` et `shutters`.
 2. `cd firmware && pio run -e <nœud>[-c3|-s3] -t upload` (1er flash en USB, ensuite OTA possible).
 3. Au premier démarrage, se connecter au WiFi `Domo-<nœud>-setup` et renseigner : WiFi, IP du broker MQTT
    (Home Assistant), pièce, emplacement (facultatif ; obligatoire si 2 nœuds du même type dans la même pièce,
-   ex. `door` « salon » + « fenetre » -> `door-salon-fenetre`), mot de passe OTA (8 caractères minimum ; vide = mise à jour WiFi désactivée, reflash en USB). BOOT maintenu 3 s au démarrage = réinitialisation.
+   ex. `door` « salon » + « fenetre » -> `door-salon-fenetre`), mot de passe OTA (8 caractères minimum ; vide = mise à jour WiFi désactivée, reflash en USB). Ensuite le portail ne s'ouvre plus jamais tout seul (box en panne ou plus lente à
+   redémarrer : le nœud continue ses automatismes et se reconnecte). Pour le rouvrir : alimenter le nœud
+   puis, dans les 2 s, maintenir BOOT 3 s (valeurs conservées, mots de passe vides = inchangés) ; 10 s =
+   effacement complet (seul moyen de désactiver l'OTA). Ne pas tenir BOOT pendant la mise sous tension
+   (mode téléchargement).
 4. Dans HA : intégration **MQTT** activée -> les entités apparaissent seules, rangées par pièce.
 
 ## Robustesse (socle DomoCore)
