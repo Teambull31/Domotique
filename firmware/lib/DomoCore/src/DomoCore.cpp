@@ -110,6 +110,9 @@ void DomoCore::begin() {
   if (_ota.length() >= 8) {
     ArduinoOTA.setHostname(_id.c_str());
     ArduinoOTA.setPassword(_ota.c_str());
+    ArduinoOTA.onStart([this] {
+      if (_safe) _safe();
+    });
     ArduinoOTA.onProgress([](unsigned, unsigned) { esp_task_wdt_reset(); });
     ArduinoOTA.begin();
     _otaOn = true;
@@ -160,13 +163,13 @@ bool DomoCore::connectMQTT() {
 
 void DomoCore::loop() {
   if (!_sleepySec) esp_task_wdt_reset();
-  if (_restartAt && millis() - _restartAt > 500) ESP.restart();
+  if (_restartAt && millis() - _restartAt > 500) restart();
   if (_otaOn) ArduinoOTA.handle();
   // La reconnexion WiFi est automatique, mais la pile WiFi de l'ESP32 reste parfois coincée
   // (box redémarrée, changement de canal) : au-delà de 15 min sans MQTT, on redémarre.
   // Les automatismes locaux (hors-gel, lumière auto) reprennent en quelques secondes.
   if (_mqtt.connected()) _lastOnline = millis();
-  else if (millis() - _lastOnline > 15UL * 60UL * 1000UL) ESP.restart();
+  else if (millis() - _lastOnline > 15UL * 60UL * 1000UL) restart();
   if (WiFi.status() != WL_CONNECTED) return;
   if (!_mqtt.connected()) {
     // Essais espacés progressivement (5 s -> 60 s) quand HA/le broker est arrêté longtemps

@@ -103,6 +103,8 @@ void setup() {
     }
     dirty = true;
   });
+  // OTA ou redémarrage : arrêter le moteur et mémoriser la position (sinon course jusqu'en butée)
+  core.onSafeState([] { halt(); });
   core.begin();
 }
 
