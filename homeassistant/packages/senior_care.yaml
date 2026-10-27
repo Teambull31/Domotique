@@ -70,6 +70,28 @@ alert:
     notifiers: [mobile_app_proche]
     data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
 
+# À lancer à l'installation et après chaque changement de téléphone du proche : vérifie que les
+# notifications normales ET urgentes (son même en silencieux) arrivent bien.
+script:
+  senior_test_alertes:
+    alias: "Tester les alertes du proche"
+    icon: mdi:bell-check
+    sequence:
+      - service: notify.mobile_app_proche
+        data:
+          title: "Test 1/2 : notification normale"
+          message: "Si vous lisez ceci, les alertes de la maison arrivent bien."
+      - delay: "00:00:10"
+      - service: notify.mobile_app_proche
+        data:
+          title: "Test 2/2 : alerte urgente"
+          message: "Ce test doit sonner même téléphone en silencieux. Sinon, autoriser les alertes critiques (iOS) ou le canal alarm_stream (Android) dans l'app Home Assistant."
+          data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
+      - service: persistent_notification.create
+        data:
+          title: "Test des alertes envoyé"
+          message: "2 notifications envoyées au proche à {{ now().strftime('%H:%M') }}. Vérifier avec lui qu'elles sont arrivées et que la 2e a sonné."
+
 automation:
   - alias: "Senior - aucune activité pendant la journée"
     trigger:
