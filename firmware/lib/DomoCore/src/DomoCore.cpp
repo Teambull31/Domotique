@@ -109,7 +109,7 @@ void DomoCore::begin() {
   }
 
   _mqtt.setServer(_host.c_str(), _port);
-  _mqtt.setBufferSize(1536);
+  _mqtt.setBufferSize(2048);  // discovery du thermostat ~1,3 ko
   _mqtt.setKeepAlive(30);
   _mqtt.setCallback([this](char* topic, byte* p, unsigned int l) {
     // Home Assistant redémarré : republier la discovery (après l'appel, le tampon MQTT est partagé)
@@ -226,6 +226,15 @@ void DomoCore::publishDiscovery() {
     if (e.component == "number") {
       doc["command_topic"] = _tCommand;
       doc["command_template"] = "{\"" + e.key + "\": {{ value }} }";
+    }
+    if (e.component == "climate") {  // thermostat : topics ici, modèles (templates) fournis par le nœud
+      doc.remove("state_topic");
+      doc.remove("value_template");
+      for (const char* t : {"current_temperature_topic", "temperature_state_topic",
+                            "mode_state_topic", "action_topic"})
+        doc[t] = _tTelemetry;
+      doc["temperature_command_topic"] = _tCommand;
+      doc["mode_command_topic"] = _tCommand;
     }
     if (e.component == "cover") {
       doc["command_topic"] = _tCommand;

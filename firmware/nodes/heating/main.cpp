@@ -36,9 +36,17 @@ void setup() {
 
   core.addEntity("sensor", "temperature", "Température", "temperature", "°C");
   core.addEntity("sensor", "humidity", "Humidité", "humidity", "%");
-  core.addEntity("number", "setpoint", "Consigne", "temperature", "°C",
-                 "{\"min\":10,\"max\":25,\"step\":0.5}");
-  core.addEntity("switch", "enabled", "Chauffage actif");
+  // Entité thermostat HA (carte thermostat, modes Chauffe / Arrêt ; "Arrêt" garde le hors-gel)
+  core.addEntity("climate", "thermostat", "Thermostat", nullptr, nullptr, R"({
+    "modes": ["off", "heat"], "min_temp": 10, "max_temp": 25, "temp_step": 0.5,
+    "precision": 0.1, "temperature_unit": "C",
+    "current_temperature_template": "{{ value_json.temperature }}",
+    "temperature_state_template": "{{ value_json.setpoint }}",
+    "temperature_command_template": "{\"setpoint\": {{ value }} }",
+    "mode_state_template": "{{ 'heat' if value_json.enabled else 'off' }}",
+    "mode_command_template": "{\"enabled\": {{ 'true' if value == 'heat' else 'false' }} }",
+    "action_template": "{{ 'heating' if value_json.heating else ('idle' if value_json.enabled else 'off') }}"
+  })");
   core.addEntity("binary_sensor", "heating", "En chauffe", "heat");
   core.addEntity("binary_sensor", "window", "Fenêtre ouverte détectée", "window");
   core.onCommand([](JsonDocument& d) {
