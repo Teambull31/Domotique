@@ -33,6 +33,7 @@ void halt() {
     pos = currentPos();
     state = IDLE;
     prefs.putFloat("pos", pos);
+    prefs.putBool("moving", false);
   }
   dirty = true;
 }
@@ -55,6 +56,7 @@ void moveTo(float tgt) {
   startPos = pos;
   target = tgt;
   moveMs = fabsf(tgt - startPos) * TRAVEL_MS / 100 + (end ? OVERRUN_MS : 0);
+  prefs.putBool("moving", true);  // coupure/redémarrage en route -> position inconnue au boot
   digitalWrite(dir == OPENING ? UP_PIN : DOWN_PIN, HIGH);
   state = dir;
   moveStart = millis();
@@ -75,7 +77,7 @@ void setup() {
   digitalWrite(UP_PIN, LOW);
   digitalWrite(DOWN_PIN, LOW);
   prefs.begin("shutters", false);
-  pos = prefs.getFloat("pos", -1);
+  pos = prefs.getBool("moving", false) ? -1 : prefs.getFloat("pos", -1);
 
   core.addEntity("cover", "cover", "Volet", "shutter");
   core.onCommand([](JsonDocument& d) {
