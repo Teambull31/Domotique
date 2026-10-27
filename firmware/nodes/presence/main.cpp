@@ -3,10 +3,10 @@
 // Broches selon la carte : lib/DomoCore/src/DomoPins.h
 // Résilience : si Home Assistant / le WiFi tombent, le mode auto continue en local.
 #include <DomoCore.h>
+#include <Preferences.h>
 #include <ld2410.h>
 
 #define RELAY_PIN PIN_RELAY1
-#define OFF_DELAY_MS (5UL * 60UL * 1000UL)  // extinction 5 min après la dernière présence
 #define SEND_INTERVAL_MS 30000
 
 DomoCore core("presence");
@@ -18,6 +18,9 @@ bool present = false;
 bool manual = false;  // lumière forcée depuis HA : l'auto reprend quand la pièce est vide
 unsigned long lastPresence = 0, lastSend = 0, lastRadarOk = 0, lastRetry = 0;
 bool radarFault = false;
+Preferences prefs;
+float offMin = 5;  // extinction N min après la dernière présence (réglable dans HA)
+#define OFF_DELAY_MS ((unsigned long)(offMin * 60000UL))
 bool dirty = true;
 
 void setLight(bool on) {
@@ -33,16 +36,25 @@ void setup() {
   digitalWrite(RELAY_PIN, LOW);
   Serial1.begin(256000, SERIAL_8N1, PIN_UART_RX, PIN_UART_TX);
   radarOk = radar.begin(Serial1);
+  prefs.begin("presence", false);
+  offMin = prefs.getFloat("off_min", 5);
 
   core.addEntity("binary_sensor", "presence", "Présence", "occupancy");
   core.addEntity("sensor", "distance", "Distance", "distance", "cm");
   core.addEntity("switch", "light", "Lumière");
   core.addEntity("switch", "auto", "Mode automatique");
+  core.addEntity("number", "off_min", "Extinction après", "duration", "min",
+                 "{\"min\":1,\"max\":60,\"step\":1,\"mode\":\"box\",\"entity_category\":\"config\"}");
   core.addEntity("binary_sensor", "radar_fault", "Défaut radar", "problem",
                  nullptr, "{\"entity_category\":\"diagnostic\"}");
   core.onCommand([](JsonDocument& d) {
     if (d["auto"].is<bool>()) { autoMode = d["auto"]; dirty = true; }
     if (d["light"].is<bool>()) { manual = true; setLight(d["light"]); }
+    if (d["off_min"].is<float>()) {
+      offMin = constrain((float)d["off_min"], 1.0f, 60.0f);
+      prefs.putFloat("off_min", offMin);
+      dirty = true;
+    }
   });
   core.begin();
 }
@@ -85,6 +97,7 @@ void loop() {
     doc["light"] = lightOn;
     doc["auto"] = autoMode;
     doc["radar_fault"] = radarFault;
+    doc["off_min"] = offMin;
     if (core.publishTelemetry(doc)) { lastSend = millis(); dirty = false; }
   }
 }
