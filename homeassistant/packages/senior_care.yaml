@@ -1,6 +1,9 @@
 # Package Home Assistant "tranquillité" pour personnes âgées.
 # Copier dans /config/packages/ (homeassistant: packages: !include_dir_named packages).
-# ADAPTER les entity_id (voir Paramètres > Appareils) et notify.mobile_app_* (téléphone du proche).
+# ADAPTER À CHAQUE SITE (voir Paramètres > Appareils) :
+#   1. les groupes ci-dessous : une seule liste par type de capteur, utilisée par toutes les alertes ;
+#   2. les quelques entités uniques : porte d'entrée, CO2 de la chambre, puissance de la cuisson ;
+#   3. notify.mobile_app_proche (téléphone du proche aidant).
 # Principe : aucune action demandée à la personne âgée ; seul le proche aidant est notifié.
 # Alertes urgentes (fuite, inactivité, porte la nuit) : sonnent même en mode silencieux
 # (Android : canal alarm_stream ; iOS : alerte critique, à autoriser dans l'app Companion).
@@ -17,17 +20,61 @@ input_boolean:
     name: Alertes tranquillité actives
     initial: true
 
+group:
+  senior_presence:
+    name: "Tranquillité : radars de présence"
+    entities:
+      - binary_sensor.presence_salon_presence
+      - binary_sensor.presence_chambre_presence
+      - binary_sensor.presence_cuisine_presence
+  senior_fuites:
+    name: "Tranquillité : sondes de fuite"
+    entities:
+      - binary_sensor.leak_cuisine_fuite
+      - binary_sensor.leak_salle_de_bain_fuite
+  senior_capteurs_pile:
+    name: "Tranquillité : capteurs sur pile"
+    entities:
+      - binary_sensor.door_entree_ouverture
+      - binary_sensor.leak_cuisine_fuite
+      - binary_sensor.leak_salle_de_bain_fuite
+  senior_piles:
+    name: "Tranquillité : niveaux de pile"
+    entities:
+      - sensor.door_entree_batterie
+      - sensor.leak_cuisine_batterie
+      - sensor.leak_salle_de_bain_batterie
+  senior_defauts:
+    name: "Tranquillité : défauts de capteurs"
+    entities:
+      - binary_sensor.presence_salon_defaut_radar
+      - binary_sensor.presence_chambre_defaut_radar
+      - binary_sensor.presence_cuisine_defaut_radar
+      - binary_sensor.heating_salon_defaut_capteur
+      - binary_sensor.climate_salon_defaut_capteur
+      - binary_sensor.climate_chambre_defaut_capteur
+      - binary_sensor.power_cuisson_defaut_capteur
+      - binary_sensor.air_chambre_defaut_capteur
+  senior_temperatures:
+    name: "Tranquillité : températures des pièces de vie"
+    entities:
+      - sensor.climate_salon_temperature
+      - sensor.climate_chambre_temperature
+
 template:
-  # Horodatage de la dernière activité réelle : une présence détectée ou la porte d'entrée ouverte.
-  # Seuls les passages à "on" comptent : une coupure WiFi d'un capteur (indisponible -> off) ne doit
-  # pas passer pour de l'activité. État conservé au redémarrage de HA.
+  # Horodatage de la dernière activité réelle : quelqu'un entre dans une pièce surveillée, quitte la
+  # dernière pièce occupée (il était là jusqu'à cet instant : sans ce cas, 8 h passées au salon
+  # compteraient depuis l'arrivée et déclencheraient une fausse alerte en partant), ou ouvre la porte.
+  # Une coupure WiFi d'un capteur (indisponible -> off) ne compte pas. État conservé au redémarrage.
   - trigger:
       - platform: state
-        entity_id:
-          - binary_sensor.presence_salon_presence
-          - binary_sensor.presence_chambre_presence
-          - binary_sensor.presence_cuisine_presence
-          - binary_sensor.door_entree_ouverture
+        entity_id: group.senior_presence
+        to: "on"
+      - platform: state
+        entity_id: group.senior_presence
+        from: "on"
+      - platform: state
+        entity_id: binary_sensor.door_entree_ouverture
         to: "on"
     sensor:
       - name: "Dernière activité à la maison"
@@ -40,11 +87,7 @@ template:
       - platform: time_pattern
         minutes: "/10"
       - platform: state
-        entity_id:
-          - sensor.derniere_activite_a_la_maison
-          - binary_sensor.presence_salon_presence
-          - binary_sensor.presence_chambre_presence
-          - binary_sensor.presence_cuisine_presence
+        entity_id: [sensor.derniere_activite_a_la_maison, group.senior_presence]
     binary_sensor:
       - name: "Activité récente à la maison"
         unique_id: senior_activite_recente
@@ -52,11 +95,8 @@ template:
         # Jamais d'activité enregistrée (installation neuve) : considéré actif, pas de fausse alerte.
         state: >
           {% set h = states('input_number.senior_inactivity_hours') | float(8) %}
-          {% set rooms = ['binary_sensor.presence_salon_presence',
-                          'binary_sensor.presence_chambre_presence',
-                          'binary_sensor.presence_cuisine_presence'] %}
           {% set last = states('sensor.derniere_activite_a_la_maison') | as_datetime %}
-          {{ rooms | select('is_state', 'on') | list | count > 0
+          {{ expand('group.senior_presence') | selectattr('state', 'eq', 'on') | list | count > 0
              or last is none
              or (now() - last).total_seconds() < h * 3600 }}
 
@@ -65,8 +105,7 @@ template:
         unique_id: senior_fuite_quelque_part
         device_class: moisture
         state: >
-          {{ expand(['binary_sensor.leak_cuisine_fuite', 'binary_sensor.leak_salle_de_bain_fuite'])
-             | selectattr('state', 'eq', 'on') | list | count > 0 }}
+          {{ expand('group.senior_fuites') | selectattr('state', 'eq', 'on') | list | count > 0 }}
 
 # Fuite : alerte immédiate, rappels 5 min puis 15 min après, puis toutes les 30 min, tant que l'eau est là et que le proche n'a pas
 # acquitté (Paramètres > Entités > alert.fuite_d_eau > Acquitter, ou carte du tableau de bord).
@@ -81,8 +120,7 @@ alert:
     title: "Fuite d'eau"
     message: >
       De l'eau est détectée :
-      {{ expand(['binary_sensor.leak_cuisine_fuite', 'binary_sensor.leak_salle_de_bain_fuite'])
-         | selectattr('state', 'eq', 'on') | map(attribute='name') | join(', ') }}.
+      {{ expand('group.senior_fuites') | selectattr('state', 'eq', 'on') | map(attribute='name') | join(', ') }}.
     done_message: "Fuite d'eau : plus d'eau détectée."
     notifiers: [mobile_app_proche]
     data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
@@ -160,26 +198,42 @@ automation:
 
   - alias: "Senior - capteur muet, en défaut ou batterie faible"
     trigger:
-      - platform: numeric_state
-        entity_id: [sensor.door_entree_batterie, sensor.leak_cuisine_batterie]
-        below: 20
-      - platform: state
-        entity_id: [binary_sensor.door_entree_ouverture, binary_sensor.leak_cuisine_fuite]
-        to: unavailable
-        for: "01:00:00"  # + expire_after (2 h 05) côté capteur ≈ 3 h sans nouvelles
-      # radar de présence débranché / en panne : l'alerte d'inactivité n'est plus fiable
-      - platform: state
-        entity_id: [binary_sensor.presence_salon_defaut_radar, binary_sensor.presence_chambre_defaut_radar,
-                    binary_sensor.presence_cuisine_defaut_radar,
-                    # sonde de température morte : thermostat coupé par sécurité, alerte chaud/froid aveugle
-                    binary_sensor.heating_salon_defaut_capteur, binary_sensor.climate_salon_defaut_capteur,
-                    binary_sensor.climate_chambre_defaut_capteur,
-                    binary_sensor.power_cuisson_defaut_capteur, binary_sensor.air_chambre_defaut_capteur]
-        to: "on"
+      - platform: template
+        id: pile
+        value_template: >
+          {{ expand('group.senior_piles') | map(attribute='state') | select('is_number')
+             | map('float') | select('lt', 20) | list | count > 0 }}
+      # + expire_after (2 h 05) côté capteur ≈ 3 h sans nouvelles
+      - platform: template
+        id: muet
+        value_template: >
+          {{ expand('group.senior_capteurs_pile') | selectattr('state', 'eq', 'unavailable') | list | count > 0 }}
+        for: "01:00:00"
+      # radar en panne (alerte d'inactivité aveugle), sonde morte (thermostat coupé par sécurité,
+      # alerte chaud/froid aveugle), compteur ou capteur d'air muet
+      - platform: template
+        id: defaut
+        value_template: >
+          {{ expand('group.senior_defauts') | selectattr('state', 'eq', 'on') | list | count > 0 }}
         for: "00:10:00"
     action:
       - service: notify.mobile_app_proche
-        data: { title: "Capteur à vérifier", message: "{{ trigger.to_state.name }} : batterie faible, hors ligne ou en défaut." }
+        data:
+          title: "Capteur à vérifier"
+          message: >
+            {% if trigger.id == 'pile' %}
+              {% set ns = namespace(l=[]) %}
+              {% for e in expand('group.senior_piles') if e.state | is_number and e.state | float < 20 %}
+                {% set ns.l = ns.l + [e.name ~ ' (' ~ e.state ~ ' %)'] %}
+              {% endfor %}
+              Pile faible : {{ ns.l | join(', ') }}.
+            {% elif trigger.id == 'muet' %}
+              Hors ligne depuis plus de 3 h : {{ expand('group.senior_capteurs_pile')
+                | selectattr('state', 'eq', 'unavailable') | map(attribute='name') | join(', ') }}.
+            {% else %}
+              En défaut : {{ expand('group.senior_defauts')
+                | selectattr('state', 'eq', 'on') | map(attribute='name') | join(', ') }}.
+            {% endif %}
 
   # Nécessite un nœud "power" (pince PZEM) sur le circuit de cuisson, pièce "cuisson".
   - alias: "Senior - plaque de cuisson allumée longtemps"
@@ -202,16 +256,18 @@ automation:
   # Canicule / froid : les personnes âgées ressentent mal la température et ne s'en plaignent pas.
   - alias: "Senior - température du logement trop chaude ou trop froide"
     trigger:
-      - platform: numeric_state
-        entity_id: [sensor.climate_salon_temperature, sensor.climate_chambre_temperature]
-        above: 28
-        for: "01:00:00"
+      - platform: template
         id: chaud
-      - platform: numeric_state
-        entity_id: [sensor.climate_salon_temperature, sensor.climate_chambre_temperature]
-        below: 17
+        value_template: >
+          {{ expand('group.senior_temperatures') | map(attribute='state') | select('is_number')
+             | map('float') | select('gt', 28) | list | count > 0 }}
         for: "01:00:00"
+      - platform: template
         id: froid
+        value_template: >
+          {{ expand('group.senior_temperatures') | map(attribute='state') | select('is_number')
+             | map('float') | select('lt', 17) | list | count > 0 }}
+        for: "01:00:00"
     condition:
       - condition: state
         entity_id: input_boolean.senior_alerts_enabled
@@ -221,7 +277,12 @@ automation:
         data:
           title: "{{ 'Chaleur' if trigger.id == 'chaud' else 'Froid' }} dans le logement"
           message: >
-            {{ trigger.to_state.name }} : {{ trigger.to_state.state }} °C depuis 1 h.
+            {% set ns = namespace(l=[]) %}
+            {% for e in expand('group.senior_temperatures') if e.state | is_number
+                 and ((trigger.id == 'chaud' and e.state | float > 28) or (trigger.id == 'froid' and e.state | float < 17)) %}
+              {% set ns.l = ns.l + [e.name ~ ' : ' ~ e.state ~ ' °C'] %}
+            {% endfor %}
+            {{ ns.l | join(', ') }} depuis 1 h.
             {{ 'Penser à faire boire, fermer les volets côté soleil.' if trigger.id == 'chaud'
                else 'Vérifier le chauffage.' }}
 
