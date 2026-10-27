@@ -50,7 +50,7 @@ private:
   void publishDiag();
   void addDevice(JsonDocument& doc);
 
-  String _nodeType, _id, _room = "maison";
+  String _nodeType, _id, _room = "maison", _label;
   String _host, _user, _pass, _ota;
   bool _otaOn = false, _rediscover = false;
   uint32_t _sleepySec = 0;

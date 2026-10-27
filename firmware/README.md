@@ -36,7 +36,8 @@ le DevKitC pour `air`, `presence` et `shutters`.
 1. `pip install platformio`
 2. `cd firmware && pio run -e <nœud>[-c3|-s3] -t upload` (1er flash en USB, ensuite OTA possible).
 3. Au premier démarrage, se connecter au WiFi `Domo-<nœud>-setup` et renseigner : WiFi, IP du broker MQTT
-   (Home Assistant), pièce, mot de passe OTA (8 caractères minimum ; vide = mise à jour WiFi désactivée, reflash en USB). BOOT maintenu 3 s au démarrage = réinitialisation.
+   (Home Assistant), pièce, emplacement (facultatif ; obligatoire si 2 nœuds du même type dans la même pièce,
+   ex. `door` « salon » + « fenetre » -> `door-salon-fenetre`), mot de passe OTA (8 caractères minimum ; vide = mise à jour WiFi désactivée, reflash en USB). BOOT maintenu 3 s au démarrage = réinitialisation.
 4. Dans HA : intégration **MQTT** activée -> les entités apparaissent seules, rangées par pièce.
 
 ## Robustesse (socle DomoCore)

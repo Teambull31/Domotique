@@ -45,6 +45,7 @@ void DomoCore::begin() {
   }
 
   _room = prefs.getString("room", "maison");
+  _label = prefs.getString("label", "");
   _host = prefs.getString("host", "");
   _port = prefs.getUShort("port", 1883);
   _user = prefs.getString("user", "");
@@ -56,12 +57,14 @@ void DomoCore::begin() {
   char portBuf[8];
   snprintf(portBuf, sizeof(portBuf), "%u", _port);
   WiFiManagerParameter pRoom("room", "Pièce (ex: salon)", _room.c_str(), 24);
+  WiFiManagerParameter pLabel("label", "Emplacement (facultatif, ex: fenetre) : obligatoire si 2 capteurs "
+                              "du même type dans la pièce", _label.c_str(), 24);
   WiFiManagerParameter pHost("host", "Adresse MQTT (IP de Home Assistant)", _host.c_str(), 64);
   WiFiManagerParameter pPort("port", "Port MQTT", portBuf, 6);
   WiFiManagerParameter pUser("user", "Utilisateur MQTT", _user.c_str(), 32);
   WiFiManagerParameter pPass("pass", "Mot de passe MQTT", _pass.c_str(), 64);
   WiFiManagerParameter pOta("ota", "Mot de passe OTA (vide = mise à jour WiFi désactivée)", _ota.c_str(), 32);
-  for (auto* p : {&pRoom, &pHost, &pPort, &pUser, &pPass, &pOta}) wm.addParameter(p);
+  for (auto* p : {&pRoom, &pLabel, &pHost, &pPort, &pUser, &pPass, &pOta}) wm.addParameter(p);
   bool save = false;
   wm.setSaveParamsCallback([&] { save = true; });
   wm.setConfigPortalTimeout(300);
@@ -75,6 +78,7 @@ void DomoCore::begin() {
 
   if (save) {
     prefs.putString("room", pRoom.getValue());
+    prefs.putString("label", pLabel.getValue());
     prefs.putString("host", pHost.getValue());
     int port = atoi(pPort.getValue());
     prefs.putUShort("port", (port > 0 && port < 65536) ? port : 1883);
@@ -84,7 +88,12 @@ void DomoCore::begin() {
     ESP.restart();  // recharge proprement avec la config enregistrée
   }
 
+  // Identifiant unique par nœud : 2 capteurs du même type dans une pièce partageraient sinon
+  // leurs topics MQTT et se déconnecteraient l'un l'autre en boucle.
   _id = _nodeType + "-" + slug(_room);
+  String label = _label;
+  label.trim();
+  if (label.length()) _id += "-" + slug(label);
   String base = "home/devices/" + _id;
   _tTelemetry = base + "/telemetry";
   _tStatus    = base + "/status";
@@ -123,8 +132,12 @@ bool DomoCore::connectMQTT() {
   if (_host.isEmpty()) return false;
   const char* user = _user.length() ? _user.c_str() : nullptr;
   const char* pass = _pass.length() ? _pass.c_str() : nullptr;
-  bool ok = _sleepySec ? _mqtt.connect(_id.c_str(), user, pass)
-                       : _mqtt.connect(_id.c_str(), user, pass, _tStatus.c_str(), 1, true, "offline");
+  // ID client MQTT suffixé par l'adresse de la puce : un doublon de configuration ne provoque pas
+  // de déconnexions en cascade côté broker.
+  char client[64];
+  snprintf(client, sizeof(client), "%s-%06llx", _id.c_str(), ESP.getEfuseMac() & 0xFFFFFF);
+  bool ok = _sleepySec ? _mqtt.connect(client, user, pass)
+                       : _mqtt.connect(client, user, pass, _tStatus.c_str(), 1, true, "offline");
   if (!ok) {
     Serial.printf("MQTT rc=%d\n", _mqtt.state());
     return false;
