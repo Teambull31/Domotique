@@ -71,6 +71,18 @@ de position**. Les sécurités (cellules photo-électriques, détection d'obstac
 - **Position** : contact magnétique d'extérieur (NO, adapté aux portails) entre `PIN_INPUT1` et GND, fermé
   quand le portail est fermé. Un 2e contact « ouvert » (`PIN_INPUT2`) est facultatif : le déclarer dans HA
   (**Fin de course ouvert installé**). Régler **Durée de manœuvre** (chronométrer une ouverture complète).
+- **Portail non câblable** (pas d'accès au moteur ni de courant au portail) : **télécommande
+  « sacrifiée »**. Acheter une télécommande d'origine supplémentaire, l'appairer au portail, et brancher un
+  optocoupleur (PC817) ou le relais aux bornes de son bouton : le nœud `gate`, dans la maison à portée
+  radio, « appuie » dessus. Marche avec toutes les marques, y compris les codes tournants (Nice, Came,
+  BFT, FAAC…), qu'on ne peut pas copier. La position vient alors d'un nœud `door` sur pile posé au
+  portail (pièce « portail ») : activer **Position fournie par HA** sur le nœud gate et adapter
+  l'automatisation « position du portail transmise » de `packages/maison.yaml`.
+  Copier le signal d'une télécommande n'est possible qu'avec un **code fixe** (anciennes 433 MHz) ;
+  Somfy RTS peut être appairé comme une nouvelle télécommande (ESP32 + CC1101, projet ESPSomfy-RTS).
+- **Manœuvre non confirmée** : si le portail n'atteint pas la position attendue 30 s après la durée de
+  manœuvre (ordre radio perdu, obstacle, panne), le nœud le signale ; c'est repris par « État de la
+  maison » et l'alerte « Capteur à vérifier ».
 - **Sûreté** : l'ordre n'est envoyé que si l'état le justifie (jamais d'impulsion pendant un mouvement, qui
   l'arrêterait ou l'inverserait), anti double appui, confirmation obligatoire sur l'écran ; alerte si le
   portail reste ouvert 10 min.

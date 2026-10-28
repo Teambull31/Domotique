@@ -82,3 +82,27 @@ automation:
             {{ states.cover | selectattr('attributes.device_class', 'defined')
                | selectattr('attributes.device_class', 'eq', 'gate') | selectattr('state', 'eq', 'open')
                | map(attribute='name') | join(', ') }} : penser à le refermer (bouton sur le panneau).
+
+  # Variante « télécommande sacrifiée » (portail non câblable, voir docs/PANNEAU.md) : la position du
+  # portail vient d'un nœud « door » sur pile posé au portail (pièce « portail »). HA la transmet au nœud
+  # gate (retenue : reçue aussi après un redémarrage du nœud). Activer « Position fournie par HA » sur
+  # le nœud gate. ADAPTER les deux noms ci-dessous ; sans ces équipements, cette automatisation ne fait rien.
+  - alias: "Maison - position du portail transmise au nœud portail"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.door_portail_ouverture
+        to: ["on", "off"]
+      - platform: homeassistant
+        event: start
+    condition:
+      - condition: state
+        entity_id: binary_sensor.door_portail_ouverture
+        state: ["on", "off"]
+    action:
+      - service: mqtt.publish
+        data:
+          topic: home/devices/gate-entree/command
+          payload: >
+            {"closed_ext": {{ 'true' if is_state('binary_sensor.door_portail_ouverture', 'off') else 'false' }} }
+          retain: true
+

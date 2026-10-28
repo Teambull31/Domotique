@@ -91,6 +91,7 @@ group:
       - binary_sensor.climate_chambre_defaut_capteur
       - binary_sensor.power_cuisson_defaut_capteur
       - binary_sensor.air_chambre_defaut_capteur
+      - binary_sensor.gate_entree_manoeuvre_non_confirmee  # portail : ordre (radio) non exécuté
   senior_temperatures:
     name: "Tranquillité : températures des pièces de vie"
     entities:

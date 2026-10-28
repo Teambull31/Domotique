@@ -126,7 +126,20 @@ public:
     pulseAt_ = now;
     moving_ = c != CMD_STOP;
     dir_ = c == CMD_OPEN ? OPENING : CLOSING;
+    expect_ = c == CMD_OPEN ? OPEN : c == CMD_CLOSE ? CLOSED : STOPPED;  // STOPPED = rien d'attendu
     return true;
+  }
+
+  // Manœuvre non confirmée : la position attendue (ouvert/fermé) n'est pas atteinte `marginMs` après
+  // la fin de course théorique. Indispensable quand l'ordre part par radio (télécommande) : rien ne
+  // prouve qu'il a été reçu. Effacée dès que la position attendue est atteinte ou au prochain ordre.
+  bool unconfirmed(State s, unsigned long now, unsigned long marginMs = 30000) {
+    if (expect_ == STOPPED) return false;
+    if (s == expect_) {
+      expect_ = STOPPED;
+      return false;
+    }
+    return now - pulseAt_ > travel_ + marginMs;
   }
 
   static const char* name(State s) {
@@ -137,7 +150,7 @@ public:
 private:
   unsigned long travel_, gap_, pulseAt_ = 0;
   bool pulsed_ = false, moving_ = false;
-  State dir_ = OPENING;
+  State dir_ = OPENING, expect_ = STOPPED;
 };
 
 // Réglage relu en mémoire flash ou reçu de HA : borné, et valeur par défaut si NaN

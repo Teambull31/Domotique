@@ -238,6 +238,26 @@ void test_portail_mouvement_estime_expire() {
   TEST_ASSERT_EQUAL(GateLogic::STOPPED, g.state(false, 0, 1000 + TRAVEL + 1));  // bloqué en route
 }
 
+void test_portail_fermeture_confirmee() {
+  GateLogic g(TRAVEL);
+  g.command(GateLogic::CMD_CLOSE, GateLogic::OPEN, 1000);
+  TEST_ASSERT_FALSE(g.unconfirmed(GateLogic::CLOSING, 10000));
+  TEST_ASSERT_FALSE(g.unconfirmed(GateLogic::CLOSED, 20000));             // atteint : confirmé
+  TEST_ASSERT_FALSE(g.unconfirmed(GateLogic::OPEN, 1000 + TRAVEL + 60000));  // plus rien d'attendu
+}
+void test_portail_fermeture_non_confirmee() {
+  GateLogic g(TRAVEL);
+  g.command(GateLogic::CMD_CLOSE, GateLogic::OPEN, 1000);  // ordre radio perdu : reste ouvert
+  TEST_ASSERT_FALSE(g.unconfirmed(GateLogic::OPEN, 1000 + TRAVEL + 29000));  // encore dans les temps
+  TEST_ASSERT_TRUE(g.unconfirmed(GateLogic::OPEN, 1000 + TRAVEL + 31000));
+}
+void test_portail_stop_n_attend_rien() {
+  GateLogic g(TRAVEL);
+  g.command(GateLogic::CMD_OPEN, GateLogic::CLOSED, 1000);
+  g.command(GateLogic::CMD_STOP, GateLogic::OPENING, 5000);
+  TEST_ASSERT_FALSE(g.unconfirmed(GateLogic::STOPPED, 1000 + TRAVEL + 60000));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -278,5 +298,8 @@ int main() {
   RUN_TEST(test_portail_ordres_inutiles_ignores);
   RUN_TEST(test_portail_anti_double_appui);
   RUN_TEST(test_portail_mouvement_estime_expire);
+  RUN_TEST(test_portail_fermeture_confirmee);
+  RUN_TEST(test_portail_fermeture_non_confirmee);
+  RUN_TEST(test_portail_stop_n_attend_rien);
   return UNITY_END();
 }

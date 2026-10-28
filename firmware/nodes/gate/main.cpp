@@ -3,6 +3,9 @@
 // Relais (contact sec, isolé) : PIN_RELAY1 -> bornier impulsion de la motorisation.
 // Fin de course « fermé » : contact (reed/fin de course) entre PIN_INPUT1 et GND, fermé = portail fermé.
 // Fin de course « ouvert » (facultatif) : entre PIN_INPUT2 et GND ; à déclarer dans HA.
+// Variante « télécommande sacrifiée » (portail non câblable) : le relais/optocoupleur appuie sur le
+// bouton d'une télécommande appairée, et la position vient d'un capteur sur pile au portail, transmise
+// par HA (« Position fournie par HA » + automatisation de packages/maison.yaml).
 // Broches selon la carte : lib/DomoCore/src/DomoPins.h
 // Les sécurités (cellules, détection d'obstacle) restent celles de la motorisation : ne rien shunter.
 #include <DomoCore.h>
@@ -19,6 +22,9 @@ DomoCore core("gate");
 Preferences prefs;
 float travelS = 25;          // durée d'une manœuvre complète (réglable dans HA)
 bool hasOpenSensor = false;  // fin de course « ouvert » câblé (réglable dans HA)
+bool extSensor = false;      // position « fermé » fournie par HA (capteur sur pile au portail)
+bool closedExt = false;      // dernière position reçue de HA
+bool unconfirmedFlag = false;
 domo::GateLogic gate(25000);
 unsigned long pulseEnd = 0, lastSend = 0;
 bool dirty = true;
@@ -42,7 +48,9 @@ struct Debounced {
 Debounced closedIn(CLOSED_PIN), openIn(OPEN_PIN);
 
 domo::GateLogic::State current() {
-  return gate.state(closedIn.read(), hasOpenSensor ? (openIn.read() ? 1 : 0) : -1, millis());
+  bool closed = extSensor ? closedExt : closedIn.read();
+  int open = (hasOpenSensor && !extSensor) ? (openIn.read() ? 1 : 0) : -1;
+  return gate.state(closed, open, millis());
 }
 
 void pulse() {
@@ -60,6 +68,7 @@ void setup() {
   prefs.begin("gate", false);
   travelS = domo::sanitize(prefs.getFloat("travel_s", 25), 5, 120, 25);
   hasOpenSensor = prefs.getBool("open_sensor", false);
+  extSensor = prefs.getBool("ext_sensor", false);
   gate.setTravel(travelS * 1000UL);
   closedIn.stable = closedIn.last = digitalRead(CLOSED_PIN) == LOW;  // état initial sans attendre
   openIn.stable = openIn.last = digitalRead(OPEN_PIN) == LOW;
@@ -69,6 +78,9 @@ void setup() {
                  "{\"min\":5,\"max\":120,\"step\":1,\"mode\":\"box\",\"entity_category\":\"config\"}");
   core.addEntity("switch", "open_sensor", "Fin de course ouvert installé", nullptr, nullptr,
                  "{\"entity_category\":\"config\"}");
+  core.addEntity("switch", "ext_sensor", "Position fournie par HA", nullptr, nullptr,
+                 "{\"entity_category\":\"config\"}");
+  core.addEntity("binary_sensor", "unconfirmed", "Manœuvre non confirmée", "problem");
   core.onCommand([](JsonDocument& d) {
     const char* c = d["gate"] | "";
     domo::GateLogic::State s = current();
@@ -81,6 +93,11 @@ void setup() {
       prefs.putFloat("travel_s", travelS);
       gate.setTravel(travelS * 1000UL);
     }
+    if (d["ext_sensor"].is<bool>()) {
+      extSensor = d["ext_sensor"];
+      prefs.putBool("ext_sensor", extSensor);
+    }
+    if (d["closed_ext"].is<bool>()) closedExt = d["closed_ext"];  // envoyé (retenu) par HA
     if (d["open_sensor"].is<bool>()) {
       hasOpenSensor = d["open_sensor"];
       prefs.putBool("open_sensor", hasOpenSensor);
@@ -104,6 +121,11 @@ void loop() {
     last = s;
     dirty = true;
   }
+  bool unc = gate.unconfirmed(s, millis());
+  if (unc != unconfirmedFlag) {
+    unconfirmedFlag = unc;
+    dirty = true;
+  }
 
   bool moving = s == domo::GateLogic::OPENING || s == domo::GateLogic::CLOSING;
   if (dirty || millis() - lastSend >= (moving ? 2000UL : 60000UL)) {
@@ -111,6 +133,8 @@ void loop() {
     doc["gate"] = domo::GateLogic::name(s);
     doc["travel_s"] = travelS;
     doc["open_sensor"] = hasOpenSensor;
+    doc["ext_sensor"] = extSensor;
+    doc["unconfirmed"] = unconfirmedFlag;
     if (core.publishTelemetry(doc)) {
       lastSend = millis();
       dirty = false;
