@@ -53,7 +53,9 @@ le DevKitC pour `air`, `presence` et `shutters`.
 - **Nœuds secteur** : chien de garde matériel (boucle bloquée 60 s -> redémarrage), redémarrage après
   15 min sans MQTT, LWT `offline`, diagnostic dans HA (signal WiFi, durée de fonctionnement), version du
   firmware dans la fiche appareil, bouton « Redémarrer », entités redéclarées quand Home Assistant redémarre ;
-  connexion MQTT qui ne bloque pas les automatismes (délais courts, essais espacés de 5 à 60 s) ; actionneurs
+  connexion WiFi en arrière-plan et MQTT qui ne bloque pas les automatismes (délais courts, essais espacés
+  de 5 à 60 s) : box éteinte ou WiFi coupé la nuit, boutons et automatismes locaux répondent dès le
+  démarrage, sans l'attente de 2 s du bouton BOOT après un redémarrage logiciel ; actionneurs
   mis en sécurité (`onSafeState`, ex. volet arrêté et position mémorisée) avant une OTA ou un redémarrage.
 - **Nœuds sur pile** (`setSleepy`) : pas de LWT mais `expire_after` (indisponible après 2 réveils manqués),
   dernier état retenu sur le broker, jamais de portail ni de redémarrage en boucle si le WiFi manque ;

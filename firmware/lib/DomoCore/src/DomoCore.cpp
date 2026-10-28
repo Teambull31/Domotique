@@ -45,9 +45,11 @@ void DomoCore::begin() {
 
   // Bouton BOOT, à presser dans les 2 s qui suivent la mise sous tension (pressé pendant le reset,
   // l'ESP32 passe en mode téléchargement) : 3 s = portail de configuration (valeurs conservées),
-  // 10 s = effacement complet. Pas de fenêtre d'attente au réveil d'un nœud sur pile.
+  // 10 s = effacement complet. Pas de fenêtre d'attente au réveil d'un nœud sur pile, ni après un
+  // redémarrage logiciel (perte de MQTT, chien de garde) : les commandes locales reprennent aussitôt.
   bool forcePortal = false;
-  if (esp_reset_reason() != ESP_RST_DEEPSLEEP) {
+  esp_reset_reason_t reason = esp_reset_reason();
+  if (reason == ESP_RST_POWERON || reason == ESP_RST_EXT || reason == ESP_RST_UNKNOWN) {
     pinMode(PIN_BOOT, INPUT_PULLUP);
     unsigned long t0 = millis();
     while (millis() - t0 < 2000 && digitalRead(PIN_BOOT) == HIGH) delay(10);
@@ -103,13 +105,17 @@ void DomoCore::begin() {
     if (!save) ESP.restart();  // portail fermé sans enregistrer : démarrage normal
   } else if (_sleepySec && !_host.isEmpty() && fastReconnect()) {
     // réveil sur pile : connecté directement au point d'accès mémorisé
+  } else if (!_sleepySec && !_host.isEmpty()) {
+    // Nœud secteur déjà configuré : connexion en arrière-plan, sans attendre (jusqu'à 20 s sinon).
+    // Box éteinte, en redémarrage ou WiFi coupé la nuit : automatismes et boutons locaux (volets,
+    // lumière, hors-gel) actifs dès le démarrage ; MQTT se connecte dès que le WiFi revient (loop).
+    WiFi.begin();
   } else {
-    // Déjà configuré : jamais de portail automatique. Box redémarrée après une coupure (plus lente
-    // que l'ESP32) ou en panne : le nœud continue ses automatismes locaux (hors-gel, lumière auto)
-    // et le WiFi se reconnecte tout seul dès qu'il revient.
+    // Jamais configuré : portail de configuration. Nœud sur pile configuré : connexion attendue (il
+    // envoie puis se rendort), jamais de portail automatique ; WiFi absent : essai au réveil suivant.
     if (!_host.isEmpty()) {
       wm.setEnableConfigPortal(false);
-      wm.setConnectTimeout(_sleepySec ? 15 : 20);
+      wm.setConnectTimeout(15);
     }
     if (!wm.autoConnect(ap.c_str())) {
       if (_host.isEmpty() && !_sleepySec) ESP.restart();  // jamais configuré : portail au redémarrage
