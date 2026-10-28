@@ -19,23 +19,27 @@ notify:
       - action: mobile_app_proche              # ← téléphone du proche aidant
       # - action: mobile_app_telephone_de_papa # ← un 2e proche : décommenter et adapter
 
+# Réglages modifiables par le proche (tableau de bord) : PAS de valeur « initial », qui les remettrait
+# à zéro à chaque redémarrage de HA (mise à jour, coupure de courant) : alertes réactivées pendant une
+# hospitalisation, seuil modifié perdu. Valeurs par défaut appliquées une seule fois, à l'installation
+# (automatisation « réglages par défaut » plus bas).
 input_number:
   senior_inactivity_hours:
     name: Alerte si aucune présence détectée (heures)
     min: 2
     max: 24
     step: 1
-    initial: 8
 input_boolean:
   # À couper quand la personne est absente (vacances, hôpital) : coupe les alertes liées à sa présence
   # (inactivité, cuisson, chaud/froid, porte restée ouverte, CO2). Restent TOUJOURS actives : fuite
   # d'eau (dégâts), porte ouverte la nuit (intrusion si la maison est vide), capteurs en panne.
   senior_alerts_enabled:
     name: Alertes tranquillité actives
-    initial: true
   senior_daily_report:
     name: Bilan quotidien du soir
-    initial: true
+  senior_reglages_initialises:
+    name: "Tranquillité : réglages par défaut appliqués"
+    icon: mdi:cog-check
   # Allumé par le bouton d'appel, éteint par le proche quand il a pris l'appel en compte.
   # Pas de valeur initiale : un appel en cours survit à un redémarrage de HA.
   senior_appel_en_cours:
@@ -309,6 +313,29 @@ script:
             Un appel pour vérifier que tout va bien reste conseillé.
 
 automation:
+  # Première installation seulement (témoin éteint) : alertes et bilan actifs, seuil 8 h. Ensuite, les
+  # réglages du proche sont conservés d'un redémarrage à l'autre.
+  - alias: "Senior - réglages par défaut (première installation)"
+    trigger:
+      - platform: homeassistant
+        event: start
+    condition:
+      - condition: state
+        entity_id: input_boolean.senior_reglages_initialises
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: [input_boolean.senior_alerts_enabled, input_boolean.senior_daily_report]
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.senior_inactivity_hours
+        data:
+          value: 8
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.senior_reglages_initialises
+
   # Toujours active, même alertes coupées : quelqu'un demande de l'aide.
   - alias: "Senior - bouton d'appel"
     trigger:

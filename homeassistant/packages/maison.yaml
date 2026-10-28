@@ -24,6 +24,9 @@ script:
                 'push': {'sound': {'name': 'default', 'critical': 1, 'volume': 1.0}}}
                if urgent | default(false) | bool else {} }}
 
+# Tarif réglé dans Paramètres > Entités (prix TTC du kWh du contrat). Pas de valeur « initial » : elle
+# écraserait le tarif saisi à chaque redémarrage de HA. Valeur de départ posée une seule fois
+# (automatisation « réglages par défaut » plus bas).
 input_number:
   maison_tarif_kwh:
     name: Tarif de l'électricité (€/kWh)
@@ -31,9 +34,12 @@ input_number:
     max: 1
     step: 0.0001
     mode: box
-    initial: 0.25  # à remplacer par le prix TTC du kWh du contrat
     unit_of_measurement: "€/kWh"
     icon: mdi:currency-eur
+input_boolean:
+  maison_reglages_initialises:
+    name: "Maison : réglages par défaut appliqués"
+    icon: mdi:cog-check
 
 # Compteurs remis à zéro chaque jour / chaque mois, à partir du compteur total du PZEM.
 # Identifiants tirés du NOM (vérifié en démarrant HA) : sensor.electricite_aujourd_hui, sensor.electricite_ce_mois_ci
@@ -101,6 +107,26 @@ template:
             {{ (appareils() | from_json).hors_ligne }}
 
 automation:
+  # Première installation seulement : tarif de départ (ordre de grandeur du tarif réglementé, à
+  # remplacer par celui du contrat). Ensuite, le tarif saisi est conservé aux redémarrages.
+  - alias: "Maison - réglages par défaut (première installation)"
+    trigger:
+      - platform: homeassistant
+        event: start
+    condition:
+      - condition: state
+        entity_id: input_boolean.maison_reglages_initialises
+        state: "off"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.maison_tarif_kwh
+        data:
+          value: 0.2
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.maison_reglages_initialises
+
   - alias: "Maison - portail resté ouvert"
     trigger:
       - platform: template
