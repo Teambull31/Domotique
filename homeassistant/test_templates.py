@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import yaml
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.config_entries import ConfigEntries
 from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_registry as er
 from homeassistant.helpers.entity import entity_sources
@@ -248,9 +248,27 @@ async def main() -> int:
     maison({"cover.gate_entree_portail": ("closed", {"device_class": "gate"}),
             "cover.shutters_salon_volet": ("open", {"device_class": "shutter"})})
     c.check("portail la nuit : fermé (et volet ouvert) -> rien", nuit["trigger"][0]["value_template"], False)
+    c.check("portail la nuit : rappel de 22 h 30 sans objet si fermé", nuit["condition"][1]["value_template"], False)
     maison({"cover.gate_entree_portail": ("opening", {"device_class": "gate"})})
     c.check("portail la nuit : en ouverture -> alerte", nuit["trigger"][0]["value_template"], True)
-    c.check("portail la nuit : le message nomme le portail", nuit["action"][0]["data"]["message"], "gate_entree_portail")
+    c.check("portail la nuit : rappel de 22 h 30 si ouvert", nuit["condition"][1]["value_template"], True)
+    nuit_vars, nuit_notif = nuit["action"][0]["variables"], nuit["action"][1]["data"]
+
+    def nuit_trigger(trigger):
+        variables = {"trigger": trigger}
+        variables |= {k: Template(v, hass).async_render(variables) for k, v in nuit_vars.items()}
+        return variables
+
+    ouverture = nuit_trigger({"id": "ouverture", "from_state": State("cover.gate_entree_portail", "closed")})
+    c.check("portail la nuit : ouverture -> urgent", nuit_notif["urgent"], True, ouverture)
+    c.check("portail la nuit : ouverture -> heure citée", nuit_notif["message"], "gate_entree_portail s'est ouvert à", ouverture)
+    for nom, trig in (("rappel de 22 h 30", {"id": "coucher"}),
+                      ("nœud revenu en ligne", {"id": "ouverture",
+                                                "from_state": State("cover.gate_entree_portail", "unavailable")}),
+                      ("entité nouvelle", {"id": "ouverture", "from_state": None})):
+        rappel = nuit_trigger(trig)
+        c.check(f"portail la nuit : {nom} -> pas urgent", nuit_notif["urgent"], False, rappel)
+        c.check(f"portail la nuit : {nom} -> rappel", nuit_notif["message"], "est ouvert : penser à le fermer", rappel)
 
     # Position du portail transmise au nœud : JSON valide une fois passé par mqtt.publish (cv.string)
     transmise = next(a for a in MAISON["automation"] if a["alias"].startswith("Maison - position du portail"))

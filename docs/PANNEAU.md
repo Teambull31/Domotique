@@ -99,6 +99,7 @@ de position**. Les sécurités (cellules photo-électriques, détection d'obstac
   maison » et l'alerte « Capteur à vérifier ».
 - **Sûreté** : l'ordre n'est envoyé que si l'état le justifie (jamais d'impulsion pendant un mouvement, qui
   l'arrêterait ou l'inverserait), anti double appui, confirmation obligatoire sur l'écran ; alerte si le
-  portail reste ouvert 10 min.
+  portail reste ouvert 10 min, rappel à 22 h 30 s'il est encore ouvert, alerte qui sonne même en
+  silencieux s'il s'ouvre entre 22 h 30 et 6 h.
 - Boîtier étanche (IP65), alimentation 5 V depuis l'alimentation du moteur ou un bloc dédié ; tout
   raccordement au 230 V par un électricien.

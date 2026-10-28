@@ -115,27 +115,47 @@ automation:
                | selectattr('attributes.device_class', 'eq', 'gate') | selectattr('state', 'eq', 'open')
                | map(attribute='name') | join(', ') }} : penser à le refermer (bouton sur le panneau).
 
-  # Portail qui s'ouvre la nuit : intrusion, ou sortie nocturne inhabituelle d'une personne âgée.
+  # Portail qui s'ouvre la nuit : intrusion, ou sortie nocturne inhabituelle d'une personne âgée
+  # (alerte qui sonne). Portail resté ouvert depuis la soirée : rappel à 22 h 30 (l'alerte « resté
+  # ouvert 10 min » n'est envoyée qu'une fois, souvent bien avant).
   - alias: "Maison - portail ouvert la nuit"
     trigger:
       - platform: template
+        id: ouverture
         value_template: >
           {{ states.cover | selectattr('attributes.device_class', 'defined')
              | selectattr('attributes.device_class', 'eq', 'gate')
              | selectattr('state', 'in', ['open', 'opening']) | list | count > 0 }}
+      - platform: time
+        id: coucher
+        at: "22:30:00"
     condition:
       - condition: time
         after: "22:30:00"
         before: "06:00:00"
+      - condition: template
+        value_template: >
+          {{ states.cover | selectattr('attributes.device_class', 'defined')
+             | selectattr('attributes.device_class', 'eq', 'gate')
+             | selectattr('state', 'in', ['open', 'opening']) | list | count > 0 }}
     action:
-      - service: script.maison_notifier
-        data:
-          titre: "Portail ouvert en pleine nuit"
-          urgent: true
-          message: >
+      # Ouverture pendant la nuit : urgent. Déjà ouvert (rappel de 22 h 30, ou nœud qui revient en
+      # ligne après une coupure : passage de « indisponible » à « ouvert ») : simple rappel.
+      - variables:
+          nouvelle: >
+            {{ trigger.id == 'ouverture' and trigger.from_state is not none
+               and trigger.from_state.state not in ['unavailable', 'unknown'] }}
+          noms: >
             {{ states.cover | selectattr('attributes.device_class', 'defined')
                | selectattr('attributes.device_class', 'eq', 'gate') | selectattr('state', 'in', ['open', 'opening'])
-               | map(attribute='name') | join(', ') }} s'est ouvert à {{ now().strftime('%H:%M') }}.
+               | map(attribute='name') | join(', ') }}
+      - service: script.maison_notifier
+        data:
+          titre: "{{ 'Portail ouvert en pleine nuit' if nouvelle else 'Portail encore ouvert pour la nuit' }}"
+          urgent: "{{ nouvelle }}"
+          message: >
+            {{ noms ~ (" s'est ouvert à " ~ now().strftime('%H:%M') ~ '.' if nouvelle
+                       else ' est ouvert : penser à le fermer (bouton sur le panneau).') }}
 
   # Variante « télécommande sacrifiée » (portail non câblable, voir docs/PANNEAU.md) : la position du
   # portail vient d'un nœud « door » sur pile posé au portail (pièce « portail »). HA la transmet au nœud
