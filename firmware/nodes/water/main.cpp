@@ -21,8 +21,9 @@ Preferences prefs;
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 volatile uint32_t pending = 0;  // impulsions comptées par l'interruption, pas encore traitées
 volatile int64_t lastEdgeUs = 0;
-double litres = 0;              // total (litres) depuis la mise en service, recalable sur l'index
+double litres = 0;              // total (litres) depuis la mise en service : ne fait que croître
 double savedLitres = 0;
+double offsetL = 0;             // index du compteur = litres + offsetL (recalage sur le cadran)
 float litresPerPulse = 1;
 float alertMin = 60;            // minutes d'écoulement continu avant l'alerte
 unsigned long lastPulse = 0, interval = 0, lastSend = 0, lastSave = 0;
@@ -51,6 +52,8 @@ void setup() {
   prefs.begin("water", false);
   litres = savedLitres = prefs.getDouble("litres", 0);
   if (!(litres >= 0)) litres = savedLitres = 0;  // NaN ou négatif : on repart de zéro
+  offsetL = prefs.getDouble("offset", 0);
+  if (offsetL != offsetL) offsetL = 0;  // NaN
   litresPerPulse = domo::sanitize(prefs.getFloat("lpp", 1), 0.1f, 100, 1);
   alertMin = domo::sanitize(prefs.getFloat("alert_min", 60), 10, 600, 60);
 
@@ -65,11 +68,13 @@ void setup() {
   core.addEntity("number", "alerte_min", "Alerte eau qui coule après", "duration", "min",
                  "{\"min\":10,\"max\":600,\"step\":5,\"mode\":\"box\",\"entity_category\":\"config\"}");
   core.onCommand([](JsonDocument& d) {
-    if (d["index"].is<double>()) {  // recalage sur le cadran du compteur (m³) ; double : au litre près
+    // Recalage sur le cadran (m³, double : au litre près). Seul le décalage change : « Eau consommée »
+    // ne saute pas (HA compterait sinon tout l'index comme consommé le jour du réglage).
+    if (d["index"].is<double>()) {
       double index = d["index"].as<double>();
       if (index >= 0 && index <= 999999) {
-        litres = index * 1000.0;
-        save();
+        offsetL = index * 1000.0 - litres;
+        prefs.putDouble("offset", offsetL);
       }
     }
     if (d["lpp"].is<float>()) {
@@ -117,7 +122,7 @@ void loop() {
   if (dirty || now - lastSend >= (debit > 0 ? 10000UL : 60000UL)) {
     JsonDocument doc;
     doc["litres"] = round(litres * 10) / 10.0;  // double : au litre près même après des milliers de m³
-    doc["index"] = round(litres) / 1000.0;
+    doc["index"] = round(litres + offsetL) / 1000.0;
     doc["debit"] = roundf(debit * 10) / 10.0;
     doc["continu"] = continuous;
     doc["fuite_lente"] = leak;
