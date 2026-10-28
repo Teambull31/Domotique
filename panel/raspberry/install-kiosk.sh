@@ -58,17 +58,39 @@ RestartSec=5
 WantedBy=graphical.target
 UNIT
 
-# Luminosité jour / nuit (écrans DSI avec rétroéclairage pilotable)
-install -m 0755 "$(dirname "$0")/ecran.sh" /usr/local/bin/panneau-ecran
-cat >/etc/cron.d/panneau-ecran <<'CRON'
-# Panneau : écran tamisé la nuit (22 h - 7 h)
-0 22 * * * root /usr/local/bin/panneau-ecran nuit
-0 7 * * * root /usr/local/bin/panneau-ecran jour
-CRON
+# Veille de l'écran : tamisé après 1 min sans contact, plein éclat au toucher (le contact qui réveille
+# n'est pas transmis au tableau de bord), niveaux plus bas la nuit. Écrans DSI (rétroéclairage pilotable).
+install -m 0755 "$(dirname "$0")/panneau-veille.py" /usr/local/bin/panneau-veille
+install -m 0755 "$(dirname "$0")/ecran.sh" /usr/local/bin/panneau-ecran   # réglage manuel ponctuel
+if [[ ! -e /etc/default/panneau-veille ]]; then
+  cat >/etc/default/panneau-veille <<'CONF'
+# Veille du panneau (luminosités en %, heures 0-23) ; puis : sudo systemctl restart panneau-veille
+DELAI=60          # secondes sans contact avant la veille
+ACTIF_JOUR=100
+ACTIF_NUIT=40
+VEILLE_JOUR=15    # assez pour lire l'état de la maison de loin
+VEILLE_NUIT=3
+NUIT_DEBUT=22
+NUIT_FIN=7
+CONF
+fi
+cat >/etc/systemd/system/panneau-veille.service <<'UNIT'
+[Unit]
+Description=Veille de l'écran du panneau (tamisé sans contact, réveil au toucher)
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/panneau-veille
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+rm -f /etc/cron.d/panneau-ecran  # ancienne version : tamisage à heure fixe
 
 systemctl disable getty@tty1.service || true
 systemctl set-default graphical.target
 systemctl daemon-reload
-systemctl enable panneau.service
+systemctl enable panneau.service panneau-veille.service
 
 echo "Panneau installé. Redémarrer : sudo reboot"
