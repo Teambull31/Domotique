@@ -103,16 +103,16 @@ void DomoCore::begin() {
   if (forcePortal) {
     wm.startConfigPortal(ap.c_str());
     if (!save) ESP.restart();  // portail fermé sans enregistrer : démarrage normal
-  } else if (_sleepySec && !_host.isEmpty() && fastReconnect()) {
-    // réveil sur pile : connecté directement au point d'accès mémorisé
   } else if (!_sleepySec && !_host.isEmpty()) {
     // Nœud secteur déjà configuré : connexion en arrière-plan, sans attendre (jusqu'à 20 s sinon).
     // Box éteinte, en redémarrage ou WiFi coupé la nuit : automatismes et boutons locaux (volets,
     // lumière, hors-gel) actifs dès le démarrage ; MQTT se connecte dès que le WiFi revient (loop).
     WiFi.begin();
-  } else {
-    // Jamais configuré : portail de configuration. Nœud sur pile configuré : connexion attendue (il
-    // envoie puis se rendort), jamais de portail automatique ; WiFi absent : essai au réveil suivant.
+  } else if (_host.isEmpty() || !fastReconnect()) {
+    // Ici : nœud sur pile, ou jamais configuré. Réveil sur pile : connexion directe au point d'accès
+    // mémorisé (fastReconnect) ; sinon, jamais configuré : portail de configuration ; nœud sur pile
+    // configuré : connexion attendue (il envoie puis se rendort), jamais de portail automatique ;
+    // WiFi absent : essai au réveil suivant.
     if (!_host.isEmpty()) {
       wm.setEnableConfigPortal(false);
       wm.setConnectTimeout(15);
