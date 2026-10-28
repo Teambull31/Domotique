@@ -3,6 +3,7 @@
 // Broches selon la carte : lib/DomoCore/src/DomoPins.h
 // Battement de coeur toutes les heures : HA détecte un capteur mort (batterie, WiFi).
 #include <DomoCore.h>
+#include <DomoLogic.h>
 #include <DomoSleep.h>
 
 #define PROBE_PIN PIN_WAKE
@@ -10,6 +11,7 @@
 #define HEARTBEAT_SEC 3600
 
 DomoCore core("leak");
+RTC_DATA_ATTR static unsigned failures = 0;  // envois ratés d'affilée (conservé en sommeil)
 
 void setup() {
   Serial.begin(115200);
@@ -29,11 +31,18 @@ void setup() {
   JsonDocument doc;
   doc["wet"] = (level == HIGH);
   doc["battery"] = battery;
-  if (core.waitConnected(15000)) {
-    core.publishTelemetry(doc);
+  bool ok = core.waitConnected(15000) && core.publishTelemetry(doc);
+  if (ok) {
     core.flush();
+    int now = digitalRead(PROBE_PIN);
+    if (now != level) {  // sonde séchée (ou mouillée) pendant la connexion : publier l'état final,
+      doc["wet"] = (now == HIGH);  // sinon "fuite" resterait affichée (et l'alerte répétée) 1 h
+      core.publishTelemetry(doc);
+      core.flush();
+    }
   }
-  domoDeepSleep(PROBE_PIN, digitalRead(PROBE_PIN), HEARTBEAT_SEC);
+  failures = ok ? 0 : failures + 1;
+  domoDeepSleep(PROBE_PIN, digitalRead(PROBE_PIN), domo::sleepSeconds(failures, HEARTBEAT_SEC));
 }
 
 void loop() {}

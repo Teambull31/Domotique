@@ -13,6 +13,7 @@ using domo::batteryPercent;
 using domo::shutterMoveMs;
 using domo::shutterPosition;
 using domo::sanitize;
+using domo::sleepSeconds;
 using domo::slug;
 
 void setUp() {}
@@ -181,6 +182,18 @@ void test_cycle_etat_inchange_ne_consomme_pas_le_delai() {
   TEST_ASSERT_FALSE(g.apply(true, false, false, 1000 + CYCLE));
 }
 
+// --- Sommeil des nœuds sur pile ---
+void test_sommeil_normal_apres_envoi_reussi() { TEST_ASSERT_EQUAL_UINT32(3600, sleepSeconds(0, 3600)); }
+void test_sommeil_nouvel_essai_rapide_puis_espace() {
+  TEST_ASSERT_EQUAL_UINT32(60, sleepSeconds(1, 3600));
+  TEST_ASSERT_EQUAL_UINT32(120, sleepSeconds(2, 3600));
+  TEST_ASSERT_EQUAL_UINT32(480, sleepSeconds(4, 3600));
+}
+void test_sommeil_jamais_plus_que_le_battement() {
+  TEST_ASSERT_EQUAL_UINT32(3600, sleepSeconds(7, 3600));
+  TEST_ASSERT_EQUAL_UINT32(3600, sleepSeconds(1000, 3600));  // box en panne des jours : pas de dépassement
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -212,5 +225,8 @@ int main() {
   RUN_TEST(test_cycle_bascule_bloquee_moins_de_3_min);
   RUN_TEST(test_cycle_sonde_muette_coupe_immediatement);
   RUN_TEST(test_cycle_etat_inchange_ne_consomme_pas_le_delai);
+  RUN_TEST(test_sommeil_normal_apres_envoi_reussi);
+  RUN_TEST(test_sommeil_nouvel_essai_rapide_puis_espace);
+  RUN_TEST(test_sommeil_jamais_plus_que_le_battement);
   return UNITY_END();
 }

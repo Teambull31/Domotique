@@ -2,6 +2,7 @@
 // Contact reed entre PIN_WAKE et GND (fermé = porte fermée = broche à 0).
 // Diviseur 2x100k de la pile vers PIN_BATTERY. Broches selon la carte : lib/DomoCore/src/DomoPins.h
 #include <DomoCore.h>
+#include <DomoLogic.h>
 #include <DomoSleep.h>
 
 #define CONTACT_PIN PIN_WAKE
@@ -9,6 +10,7 @@
 #define HEARTBEAT_SEC 3600
 
 DomoCore core("door");
+RTC_DATA_ATTR static unsigned failures = 0;  // envois ratés d'affilée (conservé en sommeil)
 
 void setup() {
   Serial.begin(115200);
@@ -22,11 +24,11 @@ void setup() {
   core.setSleepy(HEARTBEAT_SEC);
   core.begin();
 
-  if (core.waitConnected(15000)) {
-    JsonDocument doc;
-    doc["open"] = (level == HIGH);
-    doc["battery"] = battery;
-    core.publishTelemetry(doc);
+  JsonDocument doc;
+  doc["open"] = (level == HIGH);
+  doc["battery"] = battery;
+  bool ok = core.waitConnected(15000) && core.publishTelemetry(doc);
+  if (ok) {
     core.flush();
     int now = digitalRead(CONTACT_PIN);
     if (now != level) {  // état changé pendant la connexion : publier l'état final aussi
@@ -35,8 +37,10 @@ void setup() {
       core.flush();
     }
   }
-  // Relire juste avant de dormir : si l'état a changé entre-temps, le réveil est immédiat.
-  domoDeepSleep(CONTACT_PIN, digitalRead(CONTACT_PIN), HEARTBEAT_SEC);
+  // Envoi raté : nouvel essai rapide (alerte de nuit). Relire l'état juste avant de dormir : s'il a
+  // changé entre-temps, le réveil est immédiat.
+  failures = ok ? 0 : failures + 1;
+  domoDeepSleep(CONTACT_PIN, digitalRead(CONTACT_PIN), domo::sleepSeconds(failures, HEARTBEAT_SEC));
 }
 
 void loop() {}

@@ -113,6 +113,15 @@ inline unsigned long shutterMoveMs(float from, float to, unsigned long travelMs,
   return (unsigned long)(std::fabs(to - from) * travelMs / 100) + (end ? overrunMs : 0);
 }
 
+// Nœud sur pile : durée du prochain sommeil. Envoi réussi -> battement normal ; échecs d'affilée ->
+// nouvel essai rapide (1, 2, 4, 8... min) pour ne pas retarder une alerte d'une heure, sans dépasser
+// le battement normal (box en panne longtemps : la pile ne se vide pas en réveils inutiles).
+inline unsigned long sleepSeconds(unsigned failures, unsigned long heartbeatSec) {
+  if (failures == 0) return heartbeatSec;
+  unsigned long s = 60UL << (failures > 7 ? 6 : failures - 1);
+  return s < heartbeatSec ? s : heartbeatSec;
+}
+
 // Pile Li-ion : % entre 3,3 V (vide) et 4,2 V (pleine), borné.
 inline float batteryPercent(float volts) {
   float p = (volts - 3.3f) / (4.2f - 3.3f) * 100.0f;
