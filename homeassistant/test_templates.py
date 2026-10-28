@@ -4,6 +4,7 @@ Usage : python homeassistant/test_templates.py   (prérequis : pip install homea
 check_config ne valide que la forme du YAML ; ce test vérifie le résultat des templates.
 """
 import asyncio
+import inspect
 import json
 import shutil
 import sys
@@ -14,7 +15,7 @@ from unittest.mock import patch
 
 import yaml
 from homeassistant.core import HomeAssistant, State
-from homeassistant.config_entries import ConfigEntries
+from homeassistant.config_entries import ConfigEntries, ConfigEntry
 from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_registry as er
 from homeassistant.helpers.entity import entity_sources
 from homeassistant.helpers.template import Template, async_load_custom_templates
@@ -103,24 +104,76 @@ async def main() -> int:
         c.check(name, tpl, expected)
 
     # --- Capteurs à vérifier (compteurs : une alerte par nouveau capteur en problème) ---
+    # Nœuds repérés via l'intégration MQTT (entity_sources, rempli dans un vrai HA par les entités)
+    hass.config_entries = ConfigEntries(hass, {})
+    sources = entity_sources(hass)
+
+    def noeuds(valeurs, ago=None):
+        """valeurs : {entity_id: (état, device_class)} ; entités des nœuds (MQTT) sauf « telephone »."""
+        sources.clear()
+        for e in list(hass.states.async_entity_ids()):
+            hass.states.async_remove(e)
+        for eid, (etat, classe) in valeurs.items():
+            if "telephone" not in eid:
+                sources[eid] = {"domain": "mqtt", "custom_component": False}
+            ts = dt_util.utcnow().timestamp() - (ago or {}).get(eid, 0)
+            hass.states.async_set(eid, etat, {"friendly_name": eid.split(".")[1], "device_class": classe},
+                                  timestamp=ts)
+
     piles_s, muets_s, defauts_s = (template_sensor(u) for u in
                                    ("senior_piles_faibles", "senior_capteurs_muets", "senior_capteurs_en_defaut"))
-    piles = GROUPS["senior_piles"]
-    c.states({piles[0]: "85", piles[1]: "15", piles[2]: "unavailable"})
-    c.check("piles : une pile à 15 % comptée", piles_s["state"], 1)
-    c.check("piles : le nom et le niveau sont listés", piles_s["attributes"]["noms"], f"{piles[1].split('.')[1]} (15 %)")
-    c.states({piles[0]: "100", piles[1]: "9", piles[2]: "18"})
+    noeuds({"sensor.door_entree_batterie": ("85", "battery"), "sensor.leak_cuisine_batterie": ("15", "battery"),
+            "sensor.call_chambre_batterie": ("unavailable", "battery"),
+            "sensor.telephone_du_proche_batterie": ("8", "battery")})  # téléphone : jamais compté
+    c.check("piles : une pile à 15 % comptée, pas le téléphone du proche", piles_s["state"], 1)
+    c.check("piles : le nom et le niveau sont listés", piles_s["attributes"]["noms"], "leak_cuisine_batterie (15 %)")
+    noeuds({"sensor.door_entree_batterie": ("100", "battery"), "sensor.leak_cuisine_batterie": ("9", "battery"),
+            "sensor.call_chambre_batterie": ("18", "battery")})
     c.check("piles : 2 faibles, '100' non compté (pas de comparaison de texte)", piles_s["state"], 2)
+    c.check("piles : repérées sans groupe à remplir (nouveau capteur)", piles_s["attributes"]["noms"],
+            "call_chambre_batterie (18 %)")
 
-    capteurs = GROUPS["senior_capteurs_pile"]
-    c.states({capteurs[0]: "unavailable", capteurs[1]: "unavailable", capteurs[2]: "off"},
-             ago={capteurs[0]: 2 * 3600, capteurs[1]: 600})
-    c.check("muets : seul le capteur indisponible depuis plus d'1 h compte", muets_s["state"], 1)
+    noeuds({"sensor.door_entree_batterie": ("unavailable", "battery"),
+            "sensor.leak_cuisine_batterie": ("unavailable", "battery"),
+            "sensor.call_chambre_batterie": ("60", "battery"),
+            "binary_sensor.climate_salon_defaut_capteur": ("unavailable", "problem")},  # secteur : pas compté
+           ago={"sensor.door_entree_batterie": 2 * 3600, "sensor.leak_cuisine_batterie": 600,
+                "binary_sensor.climate_salon_defaut_capteur": 2 * 3600})
+    c.check("muets : seul le capteur sur pile indisponible depuis plus d'1 h compte", muets_s["state"], 1)
+    c.check("muets : le capteur est nommé", muets_s["attributes"]["noms"], "door_entree_batterie")
 
-    defauts = GROUPS["senior_defauts"]
-    c.states({**{d: "off" for d in defauts}, defauts[0]: "on", defauts[1]: "on"},
-             ago={defauts[0]: 3600, defauts[1]: 60})
-    c.check("défauts : seul le défaut de plus de 10 min compte", defauts_s["state"], 1)
+    # Cas réel : nœud = appareil HA (pile + ouverture) ; muet seulement si TOUTES ses entités le sont
+    params = inspect.signature(ConfigEntry.__init__).parameters
+    entree = ConfigEntry(**{k: v for k, v in dict(
+        domain="mqtt", title="MQTT", data={}, source="user", version=1, minor_version=1, options={},
+        unique_id=None, discovery_keys={}, subentries_data=None).items() if k in params})
+    hass.config_entries._entries[entree.entry_id] = entree
+    noeuds({})  # registre d'abord : un état déjà présent ferait créer « ..._2 »
+    appareil = dr.async_get(hass).async_get_or_create(config_entry_id=entree.entry_id,
+                                                      identifiers={("mqtt", "door-entree")}, name="door-entree")
+    for eid in ("sensor.door_entree_batterie", "binary_sensor.door_entree_ouverture"):
+        domaine, objet = eid.split(".")
+        er.async_get(hass).async_get_or_create(domaine, "mqtt", eid, suggested_object_id=objet,
+                                               device_id=appareil.id, config_entry=entree)
+    noeuds({"sensor.door_entree_batterie": ("unavailable", "battery"),
+            "binary_sensor.door_entree_ouverture": ("unavailable", "door")},
+           ago={"sensor.door_entree_batterie": 2 * 3600, "binary_sensor.door_entree_ouverture": 2 * 3600})
+    c.check("muets : nœud muet nommé par son appareil", muets_s["attributes"]["noms"], "door-entree")
+    noeuds({"sensor.door_entree_batterie": ("unavailable", "battery"),
+            "binary_sensor.door_entree_ouverture": ("off", "door")},
+           ago={"sensor.door_entree_batterie": 2 * 3600})
+    c.check("muets : une entité du nœud répond encore -> pas muet", muets_s["state"], 0)
+
+    noeuds({"binary_sensor.presence_salon_defaut_radar": ("on", "problem"),
+            "binary_sensor.gate_entree_manoeuvre_non_confirmee": ("on", "problem"),
+            "binary_sensor.heating_salon_defaut_capteur": ("off", "problem"),
+            "binary_sensor.door_entree_ouverture": ("on", "door")},
+           ago={"binary_sensor.presence_salon_defaut_radar": 3600,
+                "binary_sensor.gate_entree_manoeuvre_non_confirmee": 60})
+    c.check("défauts : seul le défaut de plus de 10 min compte (porte ouverte : pas un défaut)",
+            defauts_s["state"], 1)
+    c.check("défauts : le capteur est nommé", defauts_s["attributes"]["noms"], "presence_salon_defaut_radar")
+    sources.clear()
 
     faults = automation("Senior - capteur muet")
     cond = faults["condition"][0]["value_template"]
@@ -235,17 +288,16 @@ async def main() -> int:
 
     # appareils connectés : entités déclarées comme créées par l'intégration MQTT (dans un vrai HA,
     # integration_entities('mqtt') lit entity_sources, rempli par les entités des nœuds)
-    hass.config_entries = ConfigEntries(hass, {})
-    sources = entity_sources(hass)
     for eid in ("sensor.climate_salon_temperature", "binary_sensor.door_entree_ouverture"):
         sources[eid] = {"domain": "mqtt", "custom_component": False}
     maison({"sensor.climate_salon_temperature": ("21", {"device_class": "temperature"}),
             "binary_sensor.door_entree_ouverture": ("unavailable", {"device_class": "door"})})
     appareils_s = maison_sensors["maison_appareils"]
     c.check("appareils : 1 en ligne, 1 hors ligne", appareils_s["state"], "1 en ligne, 1 hors ligne")
-    c.check("appareils : l'appareil muet est nommé", appareils_s["attributes"]["hors_ligne"], "door_entree_ouverture")
+    # nommé par son appareil (enregistré plus haut, comme dans un vrai HA)
+    c.check("appareils : l'appareil muet est nommé", appareils_s["attributes"]["hors_ligne"], "door-entree")
     c.check("maison : appareil hors ligne signalé", maison_sensors["maison_etat"]["attributes"]["points"],
-            "Hors ligne : binary_sensor.door_entree_ouverture")
+            "Hors ligne : door-entree")
     hass.states.async_set("binary_sensor.door_entree_ouverture", "off", {"device_class": "door"})
     c.check("appareils : tous en ligne", appareils_s["state"], "2 en ligne")
     sources.clear()
@@ -294,15 +346,19 @@ async def main() -> int:
             "cover.gate_entree_portail": ("closed", {"device_class": "gate"}),
             "sensor.door_entree_batterie": ("80", {"device_class": "battery"})})
     c.check("maison : rien à signaler -> 'Tout va bien'", etat["state"], "Tout va bien")
+    sources["sensor.door_entree_batterie"] = {"domain": "mqtt", "custom_component": False}  # pile d'un nœud
     maison({"binary_sensor.leak_cuisine_fuite": ("on", {"device_class": "moisture"}),
             "binary_sensor.fuite_d_eau_quelque_part": ("on", {"device_class": "moisture"}),
             "cover.gate_entree_portail": ("open", {"device_class": "gate"}),
             "sensor.door_entree_batterie": ("12", {"device_class": "battery"}),
+            "sensor.telephone_du_proche_batterie": ("5", {"device_class": "battery"}),  # app HA : ignoré
             "sensor.climate_salon_temperature": ("21", {"device_class": "temperature"})})
     c.check("maison : fuite + portail + pile -> '3 points' (groupe fuite non compté 2 fois)",
             etat["state"], "3 points à vérifier")
     c.check("maison : le détail nomme la fuite", etat["attributes"]["points"], "Fuite : leak_cuisine_fuite")
     c.check("maison : le détail nomme la pile", etat["attributes"]["points"], "Pile faible : door_entree_batterie (12 %)")
+    c.verify("maison : la batterie du téléphone du proche n'est pas une pile à changer",
+             "telephone" in str(Template(etat["attributes"]["points"], hass).async_render()), False)
     maison({"binary_sensor.call_chambre_appel": ("on", {"device_class": "safety"})})
     c.check("maison : appui sur le bouton d'appel signalé", etat["attributes"]["points"], "Appel à l'aide : call_chambre_appel")
     maison({"input_boolean.senior_appel_en_cours": ("on", {}),

@@ -1,7 +1,10 @@
 # Package Home Assistant "tranquillité" pour personnes âgées.
-# Copier dans /config/packages/ (homeassistant: packages: !include_dir_named packages).
+# Copier dans /config/packages/ (homeassistant: packages: !include_dir_named packages), et
+# custom_templates/maison.jinja dans /config/custom_templates/ (piles, capteurs muets ou en défaut :
+# repérés automatiquement parmi les nœuds, sans liste à tenir à jour).
 # ADAPTER À CHAQUE SITE (voir Paramètres > Appareils) :
-#   1. les groupes ci-dessous : une seule liste par type de capteur, utilisée par toutes les alertes ;
+#   1. les groupes ci-dessous (radars, sondes de fuite, boutons d'appel, températures) : une seule liste
+#      par type de capteur, utilisée par toutes les alertes ;
 #   2. les quelques entités uniques : porte d'entrée, CO2 de la chambre, puissance de la cuisson ;
 #   3. les téléphones prévenus : groupe notify « proche_aidant » ci-dessous (plusieurs proches possibles).
 # Principe : aucune action demandée à la personne âgée ; seul le proche aidant est notifié.
@@ -81,32 +84,6 @@ group:
     name: "Tranquillité : boutons d'appel"
     entities:
       - binary_sensor.call_chambre_appel
-  senior_capteurs_pile:
-    name: "Tranquillité : capteurs sur pile"
-    entities:
-      - binary_sensor.call_chambre_appel
-      - binary_sensor.door_entree_ouverture
-      - binary_sensor.leak_cuisine_fuite
-      - binary_sensor.leak_salle_de_bain_fuite
-  senior_piles:
-    name: "Tranquillité : niveaux de pile"
-    entities:
-      - sensor.call_chambre_batterie
-      - sensor.door_entree_batterie
-      - sensor.leak_cuisine_batterie
-      - sensor.leak_salle_de_bain_batterie
-  senior_defauts:
-    name: "Tranquillité : défauts de capteurs"
-    entities:
-      - binary_sensor.presence_salon_defaut_radar
-      - binary_sensor.presence_chambre_defaut_radar
-      - binary_sensor.presence_cuisine_defaut_radar
-      - binary_sensor.heating_salon_defaut_capteur
-      - binary_sensor.climate_salon_defaut_capteur
-      - binary_sensor.climate_chambre_defaut_capteur
-      - binary_sensor.power_cuisson_defaut_capteur
-      - binary_sensor.air_chambre_defaut_capteur
-      - binary_sensor.gate_entree_manoeuvre_non_confirmee  # portail : ordre (radio) non exécuté
   senior_temperatures:
     name: "Tranquillité : températures des pièces de vie"
     entities:
@@ -117,42 +94,41 @@ template:
   # Compteurs de capteurs à vérifier (une alerte à CHAQUE nouveau capteur en problème, pas seulement
   # au premier : une 2e pile faible des semaines après la 1re doit aussi être signalée).
   - sensor:
+      # Nœuds repérés automatiquement (macros de custom_templates/maison.jinja) : un nouveau capteur est
+      # surveillé dès son installation, sans liste à tenir à jour ; téléphones exclus.
       - name: "Piles faibles"
         unique_id: senior_piles_faibles
         icon: mdi:battery-alert
         state: >
-          {{ expand('group.senior_piles') | map(attribute='state') | select('is_number')
-             | map('float') | select('lt', 20) | list | count }}
+          {% from 'maison.jinja' import piles_faibles %}
+          {{ piles_faibles() | from_json | count }}
         attributes:
           noms: >
-            {% set ns = namespace(l=[]) %}
-            {% for e in expand('group.senior_piles') if e.state | is_number and e.state | float < 20 %}
-              {% set ns.l = ns.l + [e.name ~ ' (' ~ e.state ~ ' %)'] %}
-            {% endfor %}
-            {{ ns.l | join(', ') }}
+            {% from 'maison.jinja' import piles_faibles %}
+            {{ piles_faibles() | from_json | join(', ') }}
       # + expire_after (2 h 05) côté capteur : environ 3 h sans nouvelles
       - name: "Capteurs sur pile muets"
         unique_id: senior_capteurs_muets
         icon: mdi:access-point-network-off
         state: >
-          {{ expand('group.senior_capteurs_pile') | selectattr('state', 'eq', 'unavailable')
-             | selectattr('last_changed', 'lt', now() - timedelta(hours=1)) | list | count }}
+          {% from 'maison.jinja' import capteurs_muets %}
+          {{ capteurs_muets() | from_json | count }}
         attributes:
           noms: >
-            {{ expand('group.senior_capteurs_pile') | selectattr('state', 'eq', 'unavailable')
-               | selectattr('last_changed', 'lt', now() - timedelta(hours=1)) | map(attribute='name') | join(', ') }}
+            {% from 'maison.jinja' import capteurs_muets %}
+            {{ capteurs_muets() | from_json | join(', ') }}
       # radar en panne (alerte d'inactivité aveugle), sonde morte (thermostat coupé par sécurité),
-      # compteur ou capteur d'air muet ; signalé après 10 min
+      # compteur ou capteur d'air muet, portail qui n'a pas exécuté l'ordre ; signalé après 10 min
       - name: "Capteurs en défaut"
         unique_id: senior_capteurs_en_defaut
         icon: mdi:alert-circle-outline
         state: >
-          {{ expand('group.senior_defauts') | selectattr('state', 'eq', 'on')
-             | selectattr('last_changed', 'lt', now() - timedelta(minutes=10)) | list | count }}
+          {% from 'maison.jinja' import capteurs_en_defaut %}
+          {{ capteurs_en_defaut() | from_json | count }}
         attributes:
           noms: >
-            {{ expand('group.senior_defauts') | selectattr('state', 'eq', 'on')
-               | selectattr('last_changed', 'lt', now() - timedelta(minutes=10)) | map(attribute='name') | join(', ') }}
+            {% from 'maison.jinja' import capteurs_en_defaut %}
+            {{ capteurs_en_defaut() | from_json | join(', ') }}
 
   # Horodatage de la dernière activité réelle : quelqu'un entre dans une pièce surveillée, quitte la
   # dernière pièce occupée (il était là jusqu'à cet instant : sans ce cas, 8 h passées au salon

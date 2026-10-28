@@ -32,9 +32,11 @@
 - [ ] Thermostat : consigne de confort, vérifier le clic du relais en baissant puis remontant la consigne.
 
 ## 5. Alertes « tranquillité »
-- [ ] Copier `homeassistant/packages/senior_care.yaml` dans `/config/packages/` et l'adapter au site :
-      les **groupes** en tête du fichier (une liste par type de capteur : radars, sondes de fuite, piles,
-      défauts, températures), puis la porte d'entrée, le CO2 de la chambre et la puissance de cuisson.
+- [ ] Copier `homeassistant/packages/senior_care.yaml` dans `/config/packages/` et
+      `homeassistant/custom_templates/maison.jinja` dans `/config/custom_templates/`, puis adapter au site :
+      les **groupes** en tête du fichier (radars, sondes de fuite, boutons d'appel, températures), la porte
+      d'entrée, le CO2 de la chambre et la puissance de cuisson. Piles faibles, capteurs muets et défauts
+      sont repérés automatiquement parmi les nœuds (rien à lister ; téléphones exclus).
 - [ ] Vérifier (`homeassistant/check_config.sh` et `python homeassistant/test_templates.py`, ou Outils
       de développement > Vérifier la configuration), puis redémarrer HA.
 - [ ] Tableau de bord du proche : copier `homeassistant/dashboards/tranquillite.yaml` dans

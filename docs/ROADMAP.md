@@ -30,7 +30,8 @@ Tout est compilé et testé sur PC (logique) ; **rien n'est encore validé sur d
 - [x] Alertes : inactivité, porte la nuit / restée ouverte, fuite répétée jusqu'à acquittement, cuisson
       oubliée, chaleur/froid, CO2, piles et capteurs en panne
 - [x] Tableau de bord du proche aidant, bilan quotidien du soir, script de test des alertes
-- [x] Un seul endroit à adapter par site (groupes), templates testés avec le moteur de HA
+- [x] Un seul endroit à adapter par site (groupes) ; piles, capteurs muets et défauts repérés automatiquement
+      parmi les nœuds (téléphones exclus) ; templates testés avec le moteur de HA
 - [x] `call` : bouton d'appel (ESP32 sur pile, voyant de confirmation, appui bref reconnu) — complément,
       **pas** une téléassistance certifiée ; « J'ai appuyé par erreur » sur l'écran de la personne
 - [x] Plusieurs proches prévenus (groupe `notify.proche_aidant`) ; réglages du proche conservés aux

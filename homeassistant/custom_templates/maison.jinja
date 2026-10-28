@@ -30,11 +30,53 @@
 {%- for nom in (appareils() | from_json).hors_ligne -%}
   {%- set ns.l = ns.l + ['Hors ligne : ' ~ nom] -%}
 {%- endfor -%}
-{%- for e in states.sensor | selectattr('attributes.device_class', 'defined')
-     | selectattr('attributes.device_class', 'eq', 'battery') if e.state | is_number and e.state | float < 20 -%}
-  {%- set ns.l = ns.l + ['Pile faible : ' ~ e.name ~ ' (' ~ e.state ~ ' %)'] -%}
+{%- for p in piles_faibles() | from_json -%}
+  {%- set ns.l = ns.l + ['Pile faible : ' ~ p] -%}
 {%- endfor -%}
 {{ ns.l | to_json }}
+{%- endmacro %}
+
+{# Les trois macros suivantes ne regardent que les nœuds ESP32 (entités de l'intégration MQTT), repérés
+   d'après le type de leurs entités : rien à déclarer par site, aucun capteur oublié dans une liste.
+   Les téléphones (application HA : niveau de batterie) sont exclus : jamais « Pile faible » pour le
+   téléphone du proche. #}
+
+{# Piles sous `seuil` % : liste JSON de « nom (12 %) » #}
+{% macro piles_faibles(seuil=20) %}
+{%- set ns = namespace(l=[]) -%}
+{%- for e in integration_entities('mqtt') | expand | selectattr('domain', 'eq', 'sensor')
+     | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'eq', 'battery')
+     if e.state | is_number and e.state | float < seuil -%}
+  {%- set ns.l = ns.l + [e.name ~ ' (' ~ e.state ~ ' %)'] -%}
+{%- endfor -%}
+{{ ns.l | to_json }}
+{%- endmacro %}
+
+{# Capteurs sur pile (appareil avec un niveau de pile) dont toutes les entités sont indisponibles depuis
+   plus de `heures` h (+ expire_after côté capteur : environ 3 h sans nouvelles). Liste JSON de noms. #}
+{% macro capteurs_muets(heures=1) %}
+{%- set ns = namespace(l=[]) -%}
+{%- set limite = now() - timedelta(hours=heures) -%}
+{%- for b in integration_entities('mqtt') | expand | selectattr('domain', 'eq', 'sensor')
+     | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'eq', 'battery') -%}
+  {%- set d = device_id(b.entity_id) -%}
+  {%- set ents = (device_entities(d) if d else [b.entity_id]) | expand | list -%}
+  {%- if ents | rejectattr('state', 'eq', 'unavailable') | list | count == 0
+        and ents | selectattr('last_changed', 'gt', limite) | list | count == 0 -%}
+    {%- set nom = (device_attr(d, 'name') if d else none) or b.name -%}
+    {%- if nom not in ns.l %}{% set ns.l = ns.l + [nom] %}{% endif -%}
+  {%- endif -%}
+{%- endfor -%}
+{{ ns.l | to_json }}
+{%- endmacro %}
+
+{# Défauts signalés par les nœuds (radar en panne, sonde morte, manœuvre de portail non confirmée...)
+   depuis plus de `minutes` min. Liste JSON de noms. #}
+{% macro capteurs_en_defaut(minutes=10) %}
+{{ integration_entities('mqtt') | expand | selectattr('domain', 'eq', 'binary_sensor')
+   | selectattr('attributes.device_class', 'defined') | selectattr('attributes.device_class', 'eq', 'problem')
+   | selectattr('state', 'eq', 'on') | selectattr('last_changed', 'lt', now() - timedelta(minutes=minutes))
+   | map(attribute='name') | list | to_json }}
 {%- endmacro %}
 
 {# Appareils connectés (nœuds ESP32, intégration MQTT) : un appareil est en ligne si au moins une de
