@@ -16,8 +16,10 @@ Tout est compilé et testé sur PC (logique) ; **rien n'est encore validé sur d
 - [ ] `cam` : ESP32-CAM sonnette / entrée
 
 ## Phase 3 — Confort & automatisation
-- [x] `presence` : radar mmWave LD2410 + relais de lumière automatique (forçage manuel respecté)
-- [x] `shutters` : volets roulants, position estimée au temps de course (durées réglables dans HA)
+- [x] `presence` : radar mmWave LD2410 + relais de lumière automatique (forçage manuel respecté),
+      bouton mural (marche sans WiFi ni radar)
+- [x] `shutters` : volets roulants, position estimée au temps de course (durées réglables dans HA),
+      boutons muraux montée/descente (marchent sans WiFi ni HA)
 - [ ] `shutters` v2 : fin de course par mesure du courant moteur (plus précis que le temps)
 - [x] `heating` : thermostat à contact sec (entrée thermostat chaudière / vanne), hors-gel, fenêtre ouverte
 - [x] `pilote` : radiateurs électriques par fil pilote (4 ordres + mode Auto par sonde ; module 230 V posé par un électricien)
@@ -29,14 +31,19 @@ Tout est compilé et testé sur PC (logique) ; **rien n'est encore validé sur d
       oubliée, chaleur/froid, CO2, piles et capteurs en panne
 - [x] Tableau de bord du proche aidant, bilan quotidien du soir, script de test des alertes
 - [x] Un seul endroit à adapter par site (groupes), templates testés avec le moteur de HA
-- [x] `call` : bouton d'appel (ESP32 sur pile, voyant de confirmation) — complément, **pas** une téléassistance certifiée
+- [x] `call` : bouton d'appel (ESP32 sur pile, voyant de confirmation, appui bref reconnu) — complément,
+      **pas** une téléassistance certifiée ; « J'ai appuyé par erreur » sur l'écran de la personne
+- [x] Plusieurs proches prévenus (groupe `notify.proche_aidant`) ; réglages du proche conservés aux
+      redémarrages de HA
 
 ## Phase « contrôle » — panneau et tablettes
 - [x] `gate` : portail motorisé (état + commande par impulsion sécurisée)
 - [x] Tableau de bord « Maison » : panneau Raspberry Pi (kiosque) et tablette des proches
 - [x] Panneau : veille au toucher, rallumage sur alerte (appel, fuite, portail), attente de HA au démarrage,
-      pas de bandeau du navigateur après coupure ; guide d'utilisation à imprimer
-- [x] Portail : manœuvre non confirmée, variante télécommande sacrifiée, alerte d'ouverture la nuit
+      pas de bandeau du navigateur après coupure, relance nocturne du navigateur, chien de garde du Pi ;
+      guide d'utilisation à imprimer
+- [x] Portail : manœuvre non confirmée, variante télécommande sacrifiée (position inconnue tant que HA
+      ne l'a pas transmise), alerte d'ouverture la nuit, rappel à 22 h 30 s'il est resté ouvert
 - [x] État de la maison en une phrase, consommation du jour / du mois et coût estimé
 
 ## Phase 4 — Énergie
