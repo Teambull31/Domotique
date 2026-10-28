@@ -37,6 +37,8 @@ autre (voir **Changer de carte** plus bas).
 | Orange Pi (5, 3B, Zero 3…) et autres cartes ARM | **Armbian**, variante **Debian** (Bookworm ou plus récent), image minimale | écran HDMI + USB tactile le plus simple ; écran à nappe selon la carte (overlay Armbian) |
 | Toute carte sous **Ubuntu** (images Orange Pi officielles comprises) | non pris en charge | Chromium n'y existe qu'en snap : le script refuse et l'explique |
 
+Vérifié à chaque modification (CI) : installation réelle sur Debian Bookworm et Trixie puis kiosque lancé
+sans écran jusqu'à l'affichage du tableau de bord, refus d'Ubuntu (`panel/kiosque/essai-installation.sh`).
 Le script détecte la carte et le système, installe le bon navigateur (`chromium-browser` sur Raspberry Pi
 OS Bookworm, `chromium` ailleurs), ignore ce qui manque sur les images minimales, et désactive le bureau
 graphique d'une image « avec bureau » (il prendrait l'écran). Image sans pilote graphique 3D (fréquent sur

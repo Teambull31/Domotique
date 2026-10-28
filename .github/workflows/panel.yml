@@ -11,3 +11,21 @@ jobs:
       - uses: actions/checkout@v4
       - run: shellcheck panel/kiosque/*.sh homeassistant/check_config.sh
       - run: python3 panel/kiosque/test_panneau_veille.py
+  installation:
+    # Installation réelle (apt) puis kiosque lancé sans écran : défauts invisibles aux tests unitaires
+    # (paquet manquant -> écran noir, détection du navigateur, droits des fichiers)
+    name: installation (${{ matrix.systeme }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - systeme: debian:bookworm-slim  # base de Raspberry Pi OS Bookworm et d'Armbian
+          - systeme: debian:trixie-slim    # base de Raspberry Pi OS actuel
+          - systeme: ubuntu:24.04          # doit être refusé (Chromium en snap)
+            attendu: refus
+    steps:
+      - uses: actions/checkout@v4
+      - run: >
+          docker run --rm --privileged -v "$PWD/panel/kiosque:/src:ro" ${{ matrix.systeme }}
+          bash /src/essai-installation.sh ${{ matrix.attendu }}
