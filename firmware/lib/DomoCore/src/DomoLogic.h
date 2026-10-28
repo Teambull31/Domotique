@@ -242,6 +242,14 @@ inline unsigned long sleepSeconds(unsigned failures, unsigned long heartbeatSec)
   return s < heartbeatSec ? s : heartbeatSec;
 }
 
+// Bouton d'appel sur pile : appui reconnu si le bouton est encore enfoncé au démarrage, OU si le
+// réveil vient du bouton alors qu'il était armé sur l'appui. Un appui bref (100-200 ms) est déjà
+// relâché quand le programme démarre (~250 ms après le réveil) : sans la cause du réveil, il serait
+// perdu. Réveil armé sur le relâchement (bouton tenu à l'endormissement) : pas un nouvel appui.
+inline bool appelDemande(bool enfonce, bool reveilParBouton, bool armeSurAppui) {
+  return enfonce || (reveilParBouton && armeSurAppui);
+}
+
 // Pile Li-ion : % entre 3,3 V (vide) et 4,2 V (pleine), borné.
 inline float batteryPercent(float volts) {
   float p = (volts - 3.3f) / (4.2f - 3.3f) * 100.0f;

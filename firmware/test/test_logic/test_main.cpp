@@ -331,6 +331,16 @@ void test_rebond_bouton_coince_au_demarrage_sans_front() {
   TEST_ASSERT_TRUE(b.state());
 }
 
+// --- bouton d'appel sur pile ---
+void test_appel_appui_bref_relache_avant_le_demarrage() {
+  TEST_ASSERT_TRUE(domo::appelDemande(false, true, true));   // réveillé par l'appui, déjà relâché
+  TEST_ASSERT_TRUE(domo::appelDemande(true, true, true));    // appui long
+}
+void test_appel_pas_de_faux_appel() {
+  TEST_ASSERT_FALSE(domo::appelDemande(false, false, true));  // battement de coeur
+  TEST_ASSERT_FALSE(domo::appelDemande(false, true, false));  // réveil au relâchement d'un appui tenu
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -382,5 +392,7 @@ int main() {
   RUN_TEST(test_rebond_filtre_et_front_unique);
   RUN_TEST(test_rebond_parasite_bref_ignore);
   RUN_TEST(test_rebond_bouton_coince_au_demarrage_sans_front);
+  RUN_TEST(test_appel_appui_bref_relache_avant_le_demarrage);
+  RUN_TEST(test_appel_pas_de_faux_appel);
   return UNITY_END();
 }

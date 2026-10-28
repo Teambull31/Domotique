@@ -15,6 +15,21 @@
 DomoCore core("call");
 RTC_DATA_ATTR static unsigned failures = 0;   // envois ratés d'affilée (conservé en sommeil)
 RTC_DATA_ATTR static bool pending = false;    // appel pas encore transmis : à renvoyer au réveil
+RTC_DATA_ATTR static bool armedForPress = true;  // sommeil armé sur l'appui (sinon sur le relâchement)
+volatile bool pressedAwake = false;             // appui pendant l'éveil (battement, WiFi lent)
+
+void IRAM_ATTR onPress() { pressedAwake = true; }
+
+// Envoie l'appel en attente ; true si rien n'est en attente ou si l'envoi a réussi.
+bool sendPending(float battery) {
+  if (!pending) return true;
+  JsonDocument evt;
+  evt["call"] = true;
+  evt["battery"] = battery;
+  if (!core.publishTelemetry(evt, false)) return false;  // non retenu : jamais rejoué par le broker
+  pending = false;
+  return true;
+}
 
 void confirm(bool ok) {
   pinMode(PIN_LED, OUTPUT);
@@ -33,9 +48,12 @@ void confirm(bool ok) {
 void setup() {
   Serial.begin(115200);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
-  delay(20);  // rebonds
-  bool pressed = digitalRead(BUTTON_PIN) == LOW;  // lu avant le WiFi
+  esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+  bool pressed = domo::appelDemande(digitalRead(BUTTON_PIN) == LOW,  // lu avant le WiFi
+                                    cause == ESP_SLEEP_WAKEUP_EXT0 || cause == ESP_SLEEP_WAKEUP_GPIO,
+                                    armedForPress);
   if (pressed) pending = true;
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), onPress, FALLING);
   float battery = roundf(domoBatteryPercent(BATTERY_ADC));
   // off_delay : l'entité revient seule à "off" ; l'alerte côté HA reste active jusqu'à prise en compte
   core.addEntity("binary_sensor", "call", "Appel", "safety", nullptr, "{\"off_delay\":60}");
@@ -44,13 +62,7 @@ void setup() {
   core.begin();
 
   bool ok = core.waitConnected(15000);
-  if (ok && pending) {
-    JsonDocument evt;
-    evt["call"] = true;
-    evt["battery"] = battery;
-    ok = core.publishTelemetry(evt, false);  // événement non retenu : jamais rejoué par le broker
-    if (ok) pending = false;
-  }
+  ok = ok && sendPending(battery);
   if (ok) {
     JsonDocument doc;  // état de repos retenu (battement, niveau de pile)
     doc["call"] = false;
@@ -58,10 +70,20 @@ void setup() {
     core.publishTelemetry(doc);
     core.flush();
   }
+  // Appui pendant un réveil sans appel (battement de coeur, nouvel essai) : pas de réveil possible
+  // pendant l'éveil, il serait perdu. Après un appel, ce sont les rebonds du relâchement : ignorés.
+  if (pressedAwake && !pressed) {
+    pressed = pending = true;
+    ok = core.waitConnected(15000) && sendPending(battery);
+    core.flush();
+  }
+  detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
   if (pressed) confirm(ok);
   failures = ok ? 0 : failures + 1;
   // Bouton encore enfoncé : réveil au relâchement (sans effet), puis au prochain appui.
-  domoDeepSleep(BUTTON_PIN, digitalRead(BUTTON_PIN), domo::sleepSeconds(failures, HEARTBEAT_SEC));
+  int level = digitalRead(BUTTON_PIN);
+  armedForPress = level == HIGH;
+  domoDeepSleep(BUTTON_PIN, level, domo::sleepSeconds(failures, HEARTBEAT_SEC));
 }
 
 void loop() {}
