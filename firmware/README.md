@@ -10,6 +10,7 @@
 | `leak` | sonde d'eau, pile | fuite (deep sleep, confirmée sur 2 lectures) |
 | `presence` | LD2410 + relais | présence (même immobile) + lumière auto locale ; forçage HA respecté tant que la pièce est occupée ; défaut radar signalé |
 | `shutters` | 2 relais | volet roulant interverrouillé, position 0-100 % estimée et mémorisée |
+| `gate` | relais contact sec + fin(s) de course | portail motorisé : état et commande par impulsion, jamais d'impulsion pendant un mouvement ([câblage](../docs/PANNEAU.md#4-portail-motorisé-nœud-gate)) |
 | `heating` | BME280 + relais | entité thermostat HA, hors-gel, fenêtre ouverte, anti-cycles courts (3 min), coupure si capteur muet |
 
 Liste d'achat : [`docs/MATERIEL.md`](../docs/MATERIEL.md).
@@ -27,6 +28,7 @@ Chaque nœud existe pour 3 cartes : `<nœud>` (ESP32-DevKitC), `<nœud>-c3` (ESP
 | Contact porte / sonde fuite (réveil) | 33 | 3 | 6 |
 | Mesure pile (ADC) | 34 | 1 | 7 |
 | Voyant (bouton d'appel) | 26 | 4 | 4 |
+| Fin de course fermé / ouvert (portail) | 33 / 32 | 3 / 10 | 6 / 15 |
 | Bouton BOOT (configuration) | 0 | 9 | 0 |
 
 Source : `lib/DomoCore/src/DomoPins.h`. Sur C3, le réveil deep sleep n'est possible que sur GPIO0..5 et le
@@ -62,7 +64,7 @@ le DevKitC pour `air`, `presence` et `shutters`.
   volets, délai d'extinction de la lumière, correction de température.
 - Les automatismes critiques (hors-gel, lumière auto, arrêt des volets) tournent en local, sans HA ni WiFi.
 
-Les 9 nœuds compilent pour les 3 cartes (27 environnements) ;
+Les 10 nœuds compilent pour les 3 cartes (30 environnements) ;
 ils n'ont pas encore été testés sur du vrai matériel.
 
 ## Vérifications (aussi lancées par le CI à chaque push)

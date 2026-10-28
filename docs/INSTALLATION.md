@@ -38,6 +38,8 @@
       de développement > Vérifier la configuration), puis redémarrer HA.
 - [ ] Tableau de bord du proche : copier `homeassistant/dashboards/tranquillite.yaml` dans
       `/config/dashboards/` et l'enregistrer (bloc `lovelace:` en tête du fichier), adapter les `entity_id`.
+- [ ] Panneau mural et/ou tablette de la personne : tableau de bord **Maison** (état de la maison,
+      éclairage, portail, consommation), voir [PANNEAU.md](PANNEAU.md).
 - [ ] Lancer le script **Tester les alertes du proche** : les 2 notifications arrivent, la 2ᵉ sonne
       téléphone en silencieux.
 

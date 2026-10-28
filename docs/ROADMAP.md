@@ -31,9 +31,14 @@ Tout est compilé et testé sur PC (logique) ; **rien n'est encore validé sur d
 - [x] Un seul endroit à adapter par site (groupes), templates testés avec le moteur de HA
 - [x] `call` : bouton d'appel (ESP32 sur pile, voyant de confirmation) — complément, **pas** une téléassistance certifiée
 
+## Phase « contrôle » — panneau et tablettes
+- [x] `gate` : portail motorisé (état + commande par impulsion sécurisée)
+- [x] Tableau de bord « Maison » : panneau Raspberry Pi (kiosque) et tablette des proches
+- [x] État de la maison en une phrase, consommation du jour / du mois et coût estimé
+
 ## Phase 4 — Énergie
 - [ ] Délestage / heures creuses : lave-linge, chauffe-eau (relais certifiés)
-- [ ] Tableau de bord conso par pièce (HA Energy)
+- [ ] Tableau de bord conso par pièce (HA Energy) — la conso globale est sur le tableau « Maison »
 
 ## Règles
 - **230 V** : modules certifiés/isolés uniquement, tableau coupé, ou électricien pour le tableau.

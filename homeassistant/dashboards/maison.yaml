@@ -1,0 +1,173 @@
+# Tableau de bord "Maison" : panneau mural (Raspberry Pi + écran tactile) et tablette des proches.
+# Grandes tuiles au doigt, 2 pages : Accueil (commandes + état) et Consommation.
+# Installation : copier dans /config/dashboards/ et ajouter dans configuration.yaml :
+#   lovelace:
+#     dashboards:
+#       tableau-maison:
+#         mode: yaml
+#         title: Maison
+#         icon: mdi:home
+#         show_in_sidebar: true
+#         filename: dashboards/maison.yaml
+# ADAPTER les entity_id (lumières, volets, thermostat) à ceux du site ; les tuiles d'un équipement
+# absent peuvent simplement être supprimées. Nécessite packages/maison.yaml (état, consommation).
+title: Maison
+views:
+  - title: Accueil
+    path: accueil
+    icon: mdi:home
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: La maison
+          - type: tile
+            entity: sensor.etat_de_la_maison
+            name: État de la maison
+            grid_options: { columns: 12 }
+          # Détail affiché seulement s'il y a quelque chose à vérifier
+          - type: conditional
+            conditions:
+              - condition: state
+                entity: sensor.etat_de_la_maison
+                state_not: Tout va bien
+            card:
+              type: markdown
+              content: >
+                {% for p in state_attr('sensor.etat_de_la_maison', 'points') or [] %}
+                - **{{ p }}**
+                {% endfor %}
+            grid_options: { columns: 12 }
+          - type: tile
+            entity: sensor.climate_salon_temperature
+            name: Salon
+            vertical: true
+          - type: tile
+            entity: sensor.climate_chambre_temperature
+            name: Chambre
+            vertical: true
+          - type: thermostat
+            entity: climate.heating_salon_thermostat
+            name: Chauffage
+            grid_options: { columns: 12 }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Éclairage
+          # Un appui = allumer / éteindre
+          - type: tile
+            entity: light.salon
+            name: Salon
+            vertical: true
+            tap_action: { action: toggle }
+          - type: tile
+            entity: light.cuisine
+            name: Cuisine
+            vertical: true
+            tap_action: { action: toggle }
+          - type: tile
+            entity: light.chambre
+            name: Chambre
+            vertical: true
+            tap_action: { action: toggle }
+          - type: tile
+            entity: switch.presence_couloir_lumiere
+            name: Couloir
+            vertical: true
+            tap_action: { action: toggle }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Portail et volets
+          - type: tile
+            entity: cover.gate_entree_portail
+            name: Portail
+            grid_options: { columns: 12 }
+          # Confirmation obligatoire : pas d'ouverture du portail par un appui accidentel
+          - type: button
+            name: Ouvrir le portail
+            icon: mdi:gate-open
+            show_state: false
+            tap_action:
+              action: perform-action
+              perform_action: cover.open_cover
+              target: { entity_id: cover.gate_entree_portail }
+              confirmation:
+                text: Ouvrir le portail ?
+          - type: button
+            name: Fermer le portail
+            icon: mdi:gate
+            show_state: false
+            tap_action:
+              action: perform-action
+              perform_action: cover.close_cover
+              target: { entity_id: cover.gate_entree_portail }
+              confirmation:
+                text: Fermer le portail ?
+          - type: tile
+            entity: cover.shutters_salon_volet
+            name: Volet du salon
+            features:
+              - type: cover-open-close
+            grid_options: { columns: 12 }
+
+  - title: Consommation
+    path: consommation
+    icon: mdi:lightning-bolt
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: En ce moment
+          - type: gauge
+            entity: sensor.power_tableau_puissance
+            name: Puissance consommée
+            unit: W
+            min: 0
+            max: 9000  # à adapter à l'abonnement (ex. 9 kVA)
+            needle: true
+            severity: { green: 0, yellow: 3000, red: 6000 }
+            grid_options: { columns: 12 }
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Aujourd'hui
+          - type: tile
+            entity: sensor.electricite_aujourd_hui
+            name: Électricité
+            vertical: true
+          - type: tile
+            entity: sensor.cout_de_l_electricite_aujourd_hui
+            name: Coût estimé
+            vertical: true
+          - type: heading
+            heading: Ce mois-ci
+          - type: tile
+            entity: sensor.electricite_ce_mois_ci
+            name: Électricité
+            vertical: true
+          - type: tile
+            entity: sensor.cout_de_l_electricite_ce_mois_ci
+            name: Coût estimé
+            vertical: true
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Les 30 derniers jours
+          - type: statistics-graph
+            entities:
+              - entity: sensor.power_tableau_energie
+                name: Électricité (kWh par jour)
+            chart_type: bar
+            period: day
+            days_to_show: 30
+            stat_types: [change]
+            grid_options: { columns: 12, rows: 5 }

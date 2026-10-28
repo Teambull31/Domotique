@@ -14,7 +14,13 @@ Carte conseillée selon tes cartes disponibles (DevKitC = ESP32 classique, C3, S
 | `leak` | C3 (+ 100 kΩ) | sonde d'eau à sortie numérique (module comparateur), accu + support, 2 × 100 kΩ | 4–8 € |
 | `presence` | S3 ou DevKitC | radar HLK-LD2410 (B ou C), module relais 1 voie 3,3 V ou relais statique | 6–12 € |
 | `shutters` | S3 ou DevKitC | module 2 relais 3,3 V à **isolation renforcée** (ou module volet du commerce à contacts secs) | 5–10 € |
+| `gate` | DevKitC ou S3 | module relais 1 voie 3,3 V (contact sec), contact magnétique d'extérieur NO (+ un 2e facultatif), boîtier IP65 | 10–20 € |
 | `heating` | DevKitC ou S3 | BME280 + relais **contact sec** vers l'entrée thermostat de la chaudière / du fil pilote | 5–10 € |
+
+## Panneau mural (voir PANNEAU.md)
+Raspberry Pi 4 ou 5 (2 Go), alimentation officielle, microSD 16 Go, écran tactile 6-7 pouces (DSI de
+préférence : luminosité pilotable), support mural ou cadre. Tablette des proches : n'importe quelle tablette
+récente avec l'application Home Assistant.
 
 ## Commun à tous les nœuds secteur
 - Alimentation 5 V USB de qualité (≥ 1 A) ; pour un montage au tableau, module HLK-PM01 **par un électricien**.
