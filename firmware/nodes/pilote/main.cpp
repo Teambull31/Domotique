@@ -6,6 +6,7 @@
 // raccordement par un électricien, module isolé, jamais de fil pilote relié à l'ESP32 directement.
 // Sorties coupées (démarrage, panne, mise à jour) = Confort : le radiateur reprend son thermostat.
 // Antigel : en mode Arrêt, sous 7 °C mesurés, Hors-gel forcé (sonde conseillée pour cela).
+// Fenêtre ouverte (mode Auto) : chute de 1 °C en 5 min -> Hors-gel pendant 30 min.
 // Sonde (facultative, mode Auto) : SDA=PIN_SDA, SCL=PIN_SCL. Broches : lib/DomoCore/src/DomoPins.h
 #include <Adafruit_BME280.h>
 #include <DomoCore.h>
@@ -16,6 +17,7 @@
 #define NEG_PIN PIN_RELAY2
 #define HYSTERESIS 0.3f
 #define SEND_INTERVAL_MS 30000
+#define WINDOW_PAUSE_MS (30UL * 60UL * 1000UL)
 
 using domo::Pilote;
 
@@ -26,7 +28,9 @@ bool bmeOk = false, dirty = true;
 float consigne = 19, temp = NAN;
 String mode = "Confort";  // Confort | Éco | Hors-gel | Arrêt | Auto
 Pilote ordre = Pilote::CONFORT;
-unsigned long lastSend = 0, lastValid = 0;
+unsigned long lastSend = 0, lastValid = 0, windowSince = 0;
+domo::WindowDetector window(6, 1.0f);  // une mesure par minute sur 5 min (même logique que heating)
+bool windowOpen = false;
 
 const char* nomOrdre(Pilote p) {
   switch (p) {
@@ -51,7 +55,7 @@ Pilote ordreVoulu() {
   if (mode == "Éco") return Pilote::ECO;
   if (mode == "Hors-gel") return Pilote::HORS_GEL;
   if (mode == "Arrêt") return Pilote::ARRET;
-  if (mode == "Auto") return domo::piloteAuto(temp, consigne, HYSTERESIS, ordre);
+  if (mode == "Auto") return windowOpen ? Pilote::HORS_GEL : domo::piloteAuto(temp, consigne, HYSTERESIS, ordre);
   return Pilote::CONFORT;
 }
 
@@ -73,6 +77,7 @@ void setup() {
                  "{\"min\":10,\"max\":25,\"step\":0.5,\"mode\":\"box\"}");
   core.addEntity("sensor", "ordre", "Ordre envoyé", nullptr, nullptr, "{\"icon\":\"mdi:sine-wave\"}");
   core.addEntity("sensor", "temperature", "Température", "temperature", "°C");
+  core.addEntity("binary_sensor", "window", "Fenêtre ouverte détectée", "window");
   core.addEntity("binary_sensor", "sensor_fault", "Défaut capteur", "problem",
                  nullptr, "{\"entity_category\":\"diagnostic\"}");
   core.onCommand([](JsonDocument& d) {
@@ -111,6 +116,21 @@ void loop() {
   }
   if (!isnan(temp) && millis() - lastValid > 120000UL) temp = NAN;  // sonde muette
 
+  static unsigned long lastHist = 0;
+  if (!isnan(temp) && millis() - lastHist >= 60000UL) {
+    lastHist = millis();
+    if (window.add(temp) && !windowOpen && mode == "Auto") {
+      windowOpen = true;
+      windowSince = millis();
+      dirty = true;
+    }
+  }
+  if (windowOpen && (millis() - windowSince >= WINDOW_PAUSE_MS || mode != "Auto")) {
+    windowOpen = false;
+    window.reset();
+    dirty = true;
+  }
+
   appliquer(domo::piloteSecurite(ordreVoulu(), temp));
 
   // Défaut seulement si la sonde est utile (mode Auto) et après le démarrage
@@ -123,6 +143,7 @@ void loop() {
     doc["temperature"] = nullptr;
     if (!isnan(temp)) doc["temperature"] = roundf(temp * 10) / 10.0;
     doc["sensor_fault"] = fault;
+    doc["window"] = windowOpen;
     if (core.publishTelemetry(doc)) {
       lastSend = millis();
       dirty = false;
