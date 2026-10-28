@@ -3,6 +3,14 @@
 {% macro points_a_verifier() %}
 {%- set ns = namespace(l=[]) -%}
 {%- set bs = states.binary_sensor | selectattr('attributes.device_class', 'defined') | list -%}
+{#- appel à l'aide en premier : c'est lui qui doit sauter aux yeux (et rallumer le panneau) -#}
+{%- if is_state('input_boolean.senior_appel_en_cours', 'on') -%}
+  {%- set ns.l = ns.l + ["Appel à l'aide en cours"] -%}
+{%- else -%}
+  {%- for e in bs | selectattr('attributes.device_class', 'eq', 'safety') | selectattr('state', 'eq', 'on') -%}
+    {%- set ns.l = ns.l + ["Appel à l'aide : " ~ e.name] -%}
+  {%- endfor -%}
+{%- endif -%}
 {%- for e in bs | selectattr('attributes.device_class', 'eq', 'moisture') | selectattr('state', 'eq', 'on')
      if e.entity_id != 'binary_sensor.fuite_d_eau_quelque_part' -%}
   {%- set ns.l = ns.l + ['Fuite : ' ~ e.name] -%}

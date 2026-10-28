@@ -255,6 +255,12 @@ async def main() -> int:
             etat["state"], "3 points à vérifier")
     c.check("maison : le détail nomme la fuite", etat["attributes"]["points"], "Fuite : leak_cuisine_fuite")
     c.check("maison : le détail nomme la pile", etat["attributes"]["points"], "Pile faible : door_entree_batterie (12 %)")
+    maison({"binary_sensor.call_chambre_appel": ("on", {"device_class": "safety"})})
+    c.check("maison : appui sur le bouton d'appel signalé", etat["attributes"]["points"], "Appel à l'aide : call_chambre_appel")
+    maison({"input_boolean.senior_appel_en_cours": ("on", {}),
+            "binary_sensor.call_chambre_appel": ("off", {"device_class": "safety"})})
+    c.check("maison : appel en cours (pas encore pris en compte) signalé", etat["state"], "1 point à vérifier")
+    c.check("maison : appel en cours en tête de liste", etat["attributes"]["points"], "[\"Appel à l'aide en cours\"]")
 
     await hass.async_stop(force=True)
     print("TOUS OK" if not c.failures else f"{c.failures} ÉCHEC(S)")
