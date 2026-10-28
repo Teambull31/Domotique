@@ -4,6 +4,7 @@ Usage : python homeassistant/test_templates.py   (prérequis : pip install homea
 check_config ne valide que la forme du YAML ; ce test vérifie le résultat des templates.
 """
 import asyncio
+import json
 import shutil
 import sys
 import tempfile
@@ -14,7 +15,7 @@ from unittest.mock import patch
 import yaml
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntries
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import config_validation as cv, device_registry as dr, entity_registry as er
 from homeassistant.helpers.entity import entity_sources
 from homeassistant.helpers.template import Template, async_load_custom_templates
 import homeassistant.util.dt as dt_util
@@ -66,7 +67,9 @@ class Checker:
             self.hass.states.async_set(f"group.{group}", "off", {"entity_id": members})
 
     def check(self, name: str, template: str, expected, variables=None) -> None:
-        result = Template(template, self.hass).async_render(variables or {})
+        self.verify(name, Template(template, self.hass).async_render(variables or {}), expected)
+
+    def verify(self, name: str, result, expected) -> None:
         if isinstance(expected, str):
             ok = expected in str(result)
         else:
@@ -248,6 +251,14 @@ async def main() -> int:
     maison({"cover.gate_entree_portail": ("opening", {"device_class": "gate"})})
     c.check("portail la nuit : en ouverture -> alerte", nuit["trigger"][0]["value_template"], True)
     c.check("portail la nuit : le message nomme le portail", nuit["action"][0]["data"]["message"], "gate_entree_portail")
+
+    # Position du portail transmise au nœud : JSON valide une fois passé par mqtt.publish (cv.string)
+    transmise = next(a for a in MAISON["automation"] if a["alias"].startswith("Maison - position du portail"))
+    payload = transmise["action"][0]["data"]["payload"]
+    for etat_porte, attendu in (("off", True), ("on", False), ("unavailable", "unknown")):
+        maison({"binary_sensor.door_portail_ouverture": (etat_porte, {"device_class": "door"})})
+        rendu = cv.string(Template(payload, hass).async_render())
+        c.verify(f"position portail : capteur {etat_porte} -> {attendu}", json.loads(rendu)["closed_ext"], attendu)
 
     notif = MAISON["script"]["maison_notifier"]["sequence"][0]["data"]["data"]
     c.check("notifier : urgent -> sonne en silencieux", notif, "alarm_stream", {"urgent": True})

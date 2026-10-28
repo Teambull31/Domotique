@@ -139,24 +139,26 @@ automation:
 
   # Variante « télécommande sacrifiée » (portail non câblable, voir docs/PANNEAU.md) : la position du
   # portail vient d'un nœud « door » sur pile posé au portail (pièce « portail »). HA la transmet au nœud
-  # gate (retenue : reçue aussi après un redémarrage du nœud). Activer « Position fournie par HA » sur
-  # le nœud gate. ADAPTER les deux noms ci-dessous ; sans ces équipements, cette automatisation ne fait rien.
+  # gate (retenue : reçue aussi après un redémarrage du nœud). Capteur muet (pile vide) : position
+  # « inconnue » transmise, le portail s'affiche inconnu au lieu d'un état périmé, et le nœud refuse
+  # d'envoyer un ordre à l'aveugle. Activer « Position fournie par HA » sur le nœud gate.
+  # ADAPTER les deux noms ci-dessous ; sans ces équipements, cette automatisation ne fait rien.
   - alias: "Maison - position du portail transmise au nœud portail"
     trigger:
       - platform: state
         entity_id: binary_sensor.door_portail_ouverture
-        to: ["on", "off"]
+        to: ["on", "off", "unavailable"]
       - platform: homeassistant
         event: start
     condition:
       - condition: state
         entity_id: binary_sensor.door_portail_ouverture
-        state: ["on", "off"]
+        state: ["on", "off", "unavailable"]
     action:
       - service: mqtt.publish
         data:
           topic: home/devices/gate-entree/command
           payload: >
-            {"closed_ext": {{ 'true' if is_state('binary_sensor.door_portail_ouverture', 'off') else 'false' }} }
+            {"closed_ext": {{ {'off': 'true', 'on': 'false'}.get(states('binary_sensor.door_portail_ouverture'), '"unknown"') }} }
           retain: true
 

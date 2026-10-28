@@ -23,7 +23,8 @@ Preferences prefs;
 float travelS = 25;          // durée d'une manœuvre complète (réglable dans HA)
 bool hasOpenSensor = false;  // fin de course « ouvert » câblé (réglable dans HA)
 bool extSensor = false;      // position « fermé » fournie par HA (capteur sur pile au portail)
-bool closedExt = false;      // dernière position reçue de HA
+int8_t extPos = -1;          // position reçue de HA : 1 fermé, 0 ouvert, -1 inconnue (pas encore
+                             // reçue après un redémarrage, ou capteur du portail muet)
 bool unconfirmedFlag = false;
 domo::GateLogic gate(25000);
 unsigned long pulseEnd = 0, lastSend = 0;
@@ -47,8 +48,11 @@ struct Debounced {
 };
 Debounced closedIn(CLOSED_PIN), openIn(OPEN_PIN);
 
+// Position connue ? (toujours, avec les fins de course câblés)
+bool known() { return !extSensor || extPos >= 0; }
+
 domo::GateLogic::State current() {
-  bool closed = extSensor ? closedExt : closedIn.read();
+  bool closed = extSensor ? extPos == 1 : closedIn.read();
   int open = (hasOpenSensor && !extSensor) ? (openIn.read() ? 1 : 0) : -1;
   return gate.state(closed, open, millis());
 }
@@ -84,9 +88,10 @@ void setup() {
   core.onCommand([](JsonDocument& d) {
     const char* c = d["gate"] | "";
     domo::GateLogic::State s = current();
-    bool go = (!strcmp(c, "open") && gate.command(domo::GateLogic::CMD_OPEN, s, millis())) ||
+    // Position inconnue : pas d'impulsion (« fermer » un portail déjà fermé l'ouvrirait)
+    bool go = known() && ((!strcmp(c, "open") && gate.command(domo::GateLogic::CMD_OPEN, s, millis())) ||
               (!strcmp(c, "close") && gate.command(domo::GateLogic::CMD_CLOSE, s, millis())) ||
-              (!strcmp(c, "stop") && gate.command(domo::GateLogic::CMD_STOP, s, millis()));
+              (!strcmp(c, "stop") && gate.command(domo::GateLogic::CMD_STOP, s, millis())));
     if (go) pulse();
     if (d["travel_s"].is<float>()) {
       travelS = domo::sanitize(d["travel_s"], 5, 120, travelS);
@@ -97,7 +102,9 @@ void setup() {
       extSensor = d["ext_sensor"];
       prefs.putBool("ext_sensor", extSensor);
     }
-    if (d["closed_ext"].is<bool>()) closedExt = d["closed_ext"];  // envoyé (retenu) par HA
+    // Envoyé (retenu) par HA : true/false, ou "unknown" quand le capteur du portail ne répond plus
+    if (d["closed_ext"].is<bool>()) extPos = d["closed_ext"].as<bool>() ? 1 : 0;
+    else if (d["closed_ext"].is<const char*>()) extPos = -1;
     if (d["open_sensor"].is<bool>()) {
       hasOpenSensor = d["open_sensor"];
       prefs.putBool("open_sensor", hasOpenSensor);
@@ -130,7 +137,10 @@ void loop() {
   bool moving = s == domo::GateLogic::OPENING || s == domo::GateLogic::CLOSING;
   if (dirty || millis() - lastSend >= (moving ? 2000UL : 60000UL)) {
     JsonDocument doc;
-    doc["gate"] = domo::GateLogic::name(s);
+    // Inconnue -> null ("None" pour HA : état inconnu), jamais un « ouvert » supposé qui déclencherait
+    // les alertes portail ouvert
+    doc["gate"] = nullptr;
+    if (known()) doc["gate"] = domo::GateLogic::name(s);
     doc["travel_s"] = travelS;
     doc["open_sensor"] = hasOpenSensor;
     doc["ext_sensor"] = extSensor;

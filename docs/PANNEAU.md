@@ -89,7 +89,9 @@ de position**. Les sécurités (cellules photo-électriques, détection d'obstac
   radio, « appuie » dessus. Marche avec toutes les marques, y compris les codes tournants (Nice, Came,
   BFT, FAAC…), qu'on ne peut pas copier. La position vient alors d'un nœud `door` sur pile posé au
   portail (pièce « portail ») : activer **Position fournie par HA** sur le nœud gate et adapter
-  l'automatisation « position du portail transmise » de `packages/maison.yaml`.
+  l'automatisation « position du portail transmise » de `packages/maison.yaml`. Tant que la position
+  n'est pas connue (redémarrage, pile du capteur vide), le portail s'affiche **inconnu** et le nœud
+  n'envoie aucun ordre à l'aveugle (« fermer » un portail déjà fermé l'ouvrirait).
   Copier le signal d'une télécommande n'est possible qu'avec un **code fixe** (anciennes 433 MHz) ;
   Somfy RTS peut être appairé comme une nouvelle télécommande (ESP32 + CC1101, projet ESPSomfy-RTS).
 - **Manœuvre non confirmée** : si le portail n'atteint pas la position attendue 30 s après la durée de
