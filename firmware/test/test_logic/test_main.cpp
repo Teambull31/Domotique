@@ -7,6 +7,7 @@
 
 using domo::thermostatWant;
 using domo::CycleGuard;
+using domo::GateLogic;
 using domo::PresenceLight;
 using domo::WindowDetector;
 using domo::batteryPercent;
@@ -194,6 +195,49 @@ void test_sommeil_jamais_plus_que_le_battement() {
   TEST_ASSERT_EQUAL_UINT32(3600, sleepSeconds(1000, 3600));  // box en panne des jours : pas de dépassement
 }
 
+// --- Portail ---
+static const unsigned long TRAVEL = 25000;
+
+void test_portail_etat_par_capteurs() {
+  GateLogic g(TRAVEL);
+  TEST_ASSERT_EQUAL(GateLogic::CLOSED, g.state(true, -1, 0));
+  TEST_ASSERT_EQUAL(GateLogic::OPEN, g.state(false, -1, 0));    // sans capteur ouvert : pas fermé = ouvert
+  TEST_ASSERT_EQUAL(GateLogic::OPEN, g.state(false, 1, 0));
+  TEST_ASSERT_EQUAL(GateLogic::STOPPED, g.state(false, 0, 0));  // entre les deux, sans ordre en cours
+}
+void test_portail_ouvrir_depuis_ferme_puis_mouvement() {
+  GateLogic g(TRAVEL);
+  TEST_ASSERT_TRUE(g.command(GateLogic::CMD_OPEN, GateLogic::CLOSED, 1000));
+  TEST_ASSERT_EQUAL(GateLogic::OPENING, g.state(false, 0, 5000));
+  TEST_ASSERT_EQUAL(GateLogic::OPEN, g.state(false, 1, 20000));  // fin de course ouvert atteinte
+}
+void test_portail_pas_d_impulsion_pendant_un_mouvement() {
+  GateLogic g(TRAVEL);
+  g.command(GateLogic::CMD_OPEN, GateLogic::CLOSED, 1000);
+  // une 2e impulsion arrêterait ou inverserait le portail : refusée
+  TEST_ASSERT_FALSE(g.command(GateLogic::CMD_OPEN, GateLogic::OPENING, 10000));
+  TEST_ASSERT_FALSE(g.command(GateLogic::CMD_CLOSE, GateLogic::OPENING, 10000));
+  TEST_ASSERT_TRUE(g.command(GateLogic::CMD_STOP, GateLogic::OPENING, 10000));
+}
+void test_portail_ordres_inutiles_ignores() {
+  GateLogic g(TRAVEL);
+  TEST_ASSERT_FALSE(g.command(GateLogic::CMD_CLOSE, GateLogic::CLOSED, 1000));
+  TEST_ASSERT_FALSE(g.command(GateLogic::CMD_OPEN, GateLogic::OPEN, 1000));
+  TEST_ASSERT_FALSE(g.command(GateLogic::CMD_STOP, GateLogic::CLOSED, 1000));
+}
+void test_portail_anti_double_appui() {
+  GateLogic g(TRAVEL);
+  TEST_ASSERT_TRUE(g.command(GateLogic::CMD_OPEN, GateLogic::CLOSED, 1000));
+  TEST_ASSERT_FALSE(g.command(GateLogic::CMD_CLOSE, GateLogic::STOPPED, 1500));  // 0,5 s après : refusé
+  TEST_ASSERT_TRUE(g.command(GateLogic::CMD_CLOSE, GateLogic::STOPPED, 4000));
+}
+void test_portail_mouvement_estime_expire() {
+  GateLogic g(TRAVEL);
+  g.command(GateLogic::CMD_CLOSE, GateLogic::OPEN, 1000);
+  TEST_ASSERT_EQUAL(GateLogic::CLOSING, g.state(false, 0, 10000));
+  TEST_ASSERT_EQUAL(GateLogic::STOPPED, g.state(false, 0, 1000 + TRAVEL + 1));  // bloqué en route
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -228,5 +272,11 @@ int main() {
   RUN_TEST(test_sommeil_normal_apres_envoi_reussi);
   RUN_TEST(test_sommeil_nouvel_essai_rapide_puis_espace);
   RUN_TEST(test_sommeil_jamais_plus_que_le_battement);
+  RUN_TEST(test_portail_etat_par_capteurs);
+  RUN_TEST(test_portail_ouvrir_depuis_ferme_puis_mouvement);
+  RUN_TEST(test_portail_pas_d_impulsion_pendant_un_mouvement);
+  RUN_TEST(test_portail_ordres_inutiles_ignores);
+  RUN_TEST(test_portail_anti_double_appui);
+  RUN_TEST(test_portail_mouvement_estime_expire);
   return UNITY_END();
 }

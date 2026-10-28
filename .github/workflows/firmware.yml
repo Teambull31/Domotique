@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [climate, air, power, door, leak, call, presence, shutters, heating]
+        node: [climate, air, power, door, leak, call, presence, shutters, heating, gate]
         board: ['', '-c3', '-s3']   # ESP32-DevKitC, ESP32-C3, ESP32-S3
     steps:
       - uses: actions/checkout@v4

@@ -321,6 +321,10 @@ void DomoCore::publishDiscovery() {
       doc["payload_open"]  = "{\"" + e.key + "\":\"open\"}";
       doc["payload_close"] = "{\"" + e.key + "\":\"close\"}";
       doc["payload_stop"]  = "{\"" + e.key + "\":\"stop\"}";
+    }
+    // Position (curseur 0-100 %) seulement pour volets/stores ; un portail est ouvert ou fermé
+    if (e.component == "cover" && (e.deviceClass == "shutter" || e.deviceClass == "blind" ||
+                                   e.deviceClass == "curtain" || e.deviceClass == "awning")) {
       doc["position_topic"] = _tTelemetry;
       doc["position_template"] = "{{ value_json." + e.key + "_pos }}";
       doc["set_position_topic"] = _tCommand;

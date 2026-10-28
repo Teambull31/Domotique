@@ -93,6 +93,53 @@ private:
   bool seen_ = false, present_ = false, light_ = false, manual_ = false;
 };
 
+// Portail motorisé commandé par impulsion (entrée « pas à pas » de la motorisation, comme la
+// télécommande). Les sécurités restent celles du moteur (cellules, fins de course).
+// État : fin de course « fermé » (obligatoire), « ouvert » (facultatif : openSw = -1 si absent),
+// mouvement estimé pendant `travelMs` après une impulsion.
+// Une impulsion n'est envoyée que si l'état la justifie : jamais « ouvrir » un portail en mouvement
+// (une 2e impulsion l'arrêterait ou l'inverserait selon la motorisation), anti double appui.
+class GateLogic {
+public:
+  enum State { CLOSED, OPEN, OPENING, CLOSING, STOPPED };
+  enum Cmd { CMD_OPEN, CMD_CLOSE, CMD_STOP };
+
+  explicit GateLogic(unsigned long travelMs, unsigned long minGapMs = 2000)
+      : travel_(travelMs), gap_(minGapMs) {}
+  void setTravel(unsigned long travelMs) { travel_ = travelMs; }
+
+  State state(bool closedSw, int openSw, unsigned long now) const {
+    if (closedSw) return CLOSED;
+    if (openSw == 1) return OPEN;
+    if (moving_ && now - pulseAt_ < travel_) return dir_;
+    return openSw < 0 ? OPEN : STOPPED;  // sans capteur d'ouverture : pas fermé = ouvert
+  }
+
+  // true -> envoyer une impulsion maintenant.
+  bool command(Cmd c, State s, unsigned long now) {
+    if (pulsed_ && now - pulseAt_ < gap_) return false;  // double appui
+    bool go = (c == CMD_OPEN && (s == CLOSED || s == STOPPED)) ||
+              (c == CMD_CLOSE && (s == OPEN || s == STOPPED)) ||
+              (c == CMD_STOP && (s == OPENING || s == CLOSING));
+    if (!go) return false;
+    pulsed_ = true;
+    pulseAt_ = now;
+    moving_ = c != CMD_STOP;
+    dir_ = c == CMD_OPEN ? OPENING : CLOSING;
+    return true;
+  }
+
+  static const char* name(State s) {
+    static const char* n[] = {"closed", "open", "opening", "closing", "stopped"};
+    return n[s];
+  }
+
+private:
+  unsigned long travel_, gap_, pulseAt_ = 0;
+  bool pulsed_ = false, moving_ = false;
+  State dir_ = OPENING;
+};
+
 // Réglage relu en mémoire flash ou reçu de HA : borné, et valeur par défaut si NaN
 // (une consigne NaN rendrait toutes les comparaisons fausses : plus de chauffe, même hors-gel).
 inline float sanitize(float v, float lo, float hi, float def) {
