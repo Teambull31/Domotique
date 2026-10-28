@@ -5,6 +5,7 @@
 // (MOC3041 + diode 1N4007 chacun, ou module « fil pilote » du commerce). 230 V : montage et
 // raccordement par un électricien, module isolé, jamais de fil pilote relié à l'ESP32 directement.
 // Sorties coupées (démarrage, panne, mise à jour) = Confort : le radiateur reprend son thermostat.
+// Antigel : en mode Arrêt, sous 7 °C mesurés, Hors-gel forcé (sonde conseillée pour cela).
 // Sonde (facultative, mode Auto) : SDA=PIN_SDA, SCL=PIN_SCL. Broches : lib/DomoCore/src/DomoPins.h
 #include <Adafruit_BME280.h>
 #include <DomoCore.h>
@@ -110,7 +111,7 @@ void loop() {
   }
   if (!isnan(temp) && millis() - lastValid > 120000UL) temp = NAN;  // sonde muette
 
-  appliquer(ordreVoulu());
+  appliquer(domo::piloteSecurite(ordreVoulu(), temp));
 
   // Défaut seulement si la sonde est utile (mode Auto) et après le démarrage
   bool fault = mode == "Auto" && isnan(temp) && millis() > 15000;

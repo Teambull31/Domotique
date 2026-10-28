@@ -182,6 +182,13 @@ inline Pilote piloteAuto(float temp, float consigne, float hysteresis, Pilote ac
   return actuel == Pilote::CONFORT ? Pilote::CONFORT : Pilote::ECO;  // dans la bande : on garde
 }
 
+// « Arrêt » coupe aussi la protection antigel du radiateur : oublié en plein hiver (absence), il
+// peut laisser geler les canalisations. Avec une sonde, sous `antigel` °C on force Hors-gel.
+inline Pilote piloteSecurite(Pilote p, float temp, float antigel = 7.0f) {
+  if (p == Pilote::ARRET && !std::isnan(temp) && temp < antigel) return Pilote::HORS_GEL;
+  return p;
+}
+
 // Réglage relu en mémoire flash ou reçu de HA : borné, et valeur par défaut si NaN
 // (une consigne NaN rendrait toutes les comparaisons fausses : plus de chauffe, même hors-gel).
 inline float sanitize(float v, float lo, float hi, float def) {

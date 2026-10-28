@@ -10,6 +10,7 @@ using domo::CycleGuard;
 using domo::GateLogic;
 using domo::Pilote;
 using domo::piloteAuto;
+using domo::piloteSecurite;
 using domo::piloteSorties;
 using domo::PresenceLight;
 using domo::WindowDetector;
@@ -279,6 +280,13 @@ void test_pilote_auto_sonde_muette_hors_gel() {
   TEST_ASSERT_EQUAL(Pilote::HORS_GEL, piloteAuto(NAN, 19.0f, 0.3f, Pilote::CONFORT));
 }
 
+void test_pilote_arret_force_hors_gel_sous_7C() {
+  TEST_ASSERT_EQUAL(Pilote::HORS_GEL, piloteSecurite(Pilote::ARRET, 5.0f));
+  TEST_ASSERT_EQUAL(Pilote::ARRET, piloteSecurite(Pilote::ARRET, 12.0f));
+  TEST_ASSERT_EQUAL(Pilote::ARRET, piloteSecurite(Pilote::ARRET, NAN));  // sans sonde : inchangé
+  TEST_ASSERT_EQUAL(Pilote::ECO, piloteSecurite(Pilote::ECO, 3.0f));     // autres ordres intacts
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -325,5 +333,6 @@ int main() {
   RUN_TEST(test_pilote_ordres_vers_demi_alternances);
   RUN_TEST(test_pilote_auto_regulation);
   RUN_TEST(test_pilote_auto_sonde_muette_hors_gel);
+  RUN_TEST(test_pilote_arret_force_hors_gel_sous_7C);
   return UNITY_END();
 }
