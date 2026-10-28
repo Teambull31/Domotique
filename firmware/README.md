@@ -9,7 +9,7 @@
 | `call` | bouton + voyant, pile | bouton d'appel : alerte au proche répétée jusqu'à prise en compte, voyant de confirmation |
 | `leak` | sonde d'eau, pile | fuite (deep sleep, confirmée sur 2 lectures) |
 | `presence` | LD2410 + relais | présence (même immobile) + lumière auto locale ; forçage HA respecté tant que la pièce est occupée ; défaut radar signalé |
-| `shutters` | 2 relais | volet roulant interverrouillé, position 0-100 % estimée et mémorisée |
+| `shutters` | 2 relais | volet roulant interverrouillé, position 0-100 % estimée et mémorisée, boutons muraux (sans WiFi ni HA) |
 | `gate` | relais contact sec + fin(s) de course | portail motorisé : état et commande par impulsion, jamais d'impulsion pendant un mouvement ([câblage](../docs/PANNEAU.md#4-portail-motorisé-nœud-gate)) |
 | `pilote` | 2 optotriacs (+ BME280 facultatif) | radiateurs électriques par fil pilote : Confort / Éco / Hors-gel / Arrêt, ou Auto (régulation par sonde, fenêtre ouverte) ; panne = Confort ; Arrêt sous 7 °C = Hors-gel |
 | `heating` | BME280 + relais | entité thermostat HA, hors-gel, fenêtre ouverte, anti-cycles courts (3 min), coupure si capteur muet |
@@ -29,7 +29,7 @@ Chaque nœud existe pour 3 cartes : `<nœud>` (ESP32-DevKitC), `<nœud>-c3` (ESP
 | Contact porte / sonde fuite (réveil) | 33 | 3 | 6 |
 | Mesure pile (ADC) | 34 | 1 | 7 |
 | Voyant (bouton d'appel) | 26 | 4 | 4 |
-| Fin de course fermé / ouvert (portail) | 33 / 32 | 3 / 10 | 6 / 15 |
+| Fin de course fermé / ouvert (portail), boutons montée / descente (volet) | 33 / 32 | 3 / 10 | 6 / 15 |
 | Bouton BOOT (configuration) | 0 | 9 | 0 |
 
 Source : `lib/DomoCore/src/DomoPins.h`. Sur C3, le réveil deep sleep n'est possible que sur GPIO0..5 et le
@@ -63,7 +63,8 @@ le DevKitC pour `air`, `presence` et `shutters`.
   de diagnostic « Défaut capteur » / « Défaut radar », reprise par l'alerte « Capteur à vérifier ».
 - Réglages sur place depuis HA (Paramètres de l'appareil), sans recompiler : durées de montée/descente des
   volets, délai d'extinction de la lumière, correction de température.
-- Les automatismes critiques (hors-gel, lumière auto, arrêt des volets) tournent en local, sans HA ni WiFi.
+- Les automatismes critiques (hors-gel, lumière auto, arrêt des volets) et les boutons muraux des volets
+  tournent en local, sans HA ni WiFi.
 
 Les 11 nœuds compilent pour les 3 cartes (33 environnements) ;
 ils n'ont pas encore été testés sur du vrai matériel.

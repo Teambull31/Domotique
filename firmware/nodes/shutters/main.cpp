@@ -5,6 +5,10 @@
 // Position estimée au temps de course (0 = fermé, 100 = ouvert), mémorisée à chaque arrêt.
 // Aller en butée (0 ou 100) prolonge la course pour recaler l'estimation.
 // Durées de montée / descente réglables dans HA (Paramètres de l'appareil) : chronométrer chaque volet.
+// Boutons muraux (facultatifs, fonctionnent sans WiFi ni HA) : poussoirs BASSE TENSION entre
+// PIN_INPUT1 (montée) / PIN_INPUT2 (descente) et GND. Un appui : course complète ; un appui pendant
+// la course : arrêt. Jamais l'inverseur 230 V existant relié à l'ESP32 : le remplacer par un
+// poussoir double basse tension, ou passer par un module optocoupleur 230 V.
 #include <DomoCore.h>
 #include <DomoLogic.h>
 #include <Preferences.h>
@@ -13,6 +17,8 @@
 #define DOWN_PIN PIN_RELAY2
 #define OVERRUN_MS 2000UL   // dépassement en butée pour se recaler
 #define DEAD_TIME_MS 500UL  // pause obligatoire à l'inversion
+#define BTN_UP_PIN PIN_INPUT1
+#define BTN_DOWN_PIN PIN_INPUT2
 
 DomoCore core("shutters");
 Preferences prefs;
@@ -22,6 +28,7 @@ float startPos = 0, target = 0;
 unsigned long moveStart = 0, moveMs = 0, lastSend = 0;
 bool dirty = true;
 float upS = 25, downS = 25;  // durée de course complète (s), la descente est souvent plus rapide
+domo::Debouncer btnUp(50), btnDown(50);
 
 unsigned long travelMs(State dir) { return (dir == OPENING ? upS : downS) * 1000UL; }
 
@@ -68,6 +75,13 @@ void moveTo(float tgt) {
   dirty = true;
 }
 
+// Bouton mural : à l'appui, arrêt si le volet bouge, sinon course complète vers `cible`
+void bouton(domo::Debouncer& b, int pin, float cible) {
+  if (!b.update(digitalRead(pin) == LOW, millis()) || !b.state()) return;
+  if (state != IDLE) halt();
+  else moveTo(cible);
+}
+
 const char* stateName() {
   if (state == OPENING) return "opening";
   if (state == CLOSING) return "closing";
@@ -81,6 +95,10 @@ void setup() {
   pinMode(DOWN_PIN, OUTPUT);
   digitalWrite(UP_PIN, LOW);
   digitalWrite(DOWN_PIN, LOW);
+  pinMode(BTN_UP_PIN, INPUT_PULLUP);  // sans bouton câblé : entrée au repos, aucun effet
+  pinMode(BTN_DOWN_PIN, INPUT_PULLUP);
+  btnUp.reset(digitalRead(BTN_UP_PIN) == LOW);  // bouton coincé au démarrage : pas de course
+  btnDown.reset(digitalRead(BTN_DOWN_PIN) == LOW);
   prefs.begin("shutters", false);
   pos = prefs.getBool("moving", false) ? -1 : prefs.getFloat("pos", -1);
   if (!(pos >= 0 && pos <= 100)) pos = -1;  // valeur invalide (ou NaN) : position inconnue
@@ -110,6 +128,8 @@ void setup() {
 
 void loop() {
   core.loop();
+  bouton(btnUp, BTN_UP_PIN, 100);
+  bouton(btnDown, BTN_DOWN_PIN, 0);
   if (state != IDLE && millis() - moveStart >= moveMs) {
     halt();
     pos = target;  // butée ou cible atteinte

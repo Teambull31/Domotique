@@ -93,6 +93,28 @@ private:
   bool seen_ = false, present_ = false, light_ = false, manual_ = false;
 };
 
+// Entrée filtrée (rebonds d'un contact ou d'un bouton) : l'état stable change après `ms` sans
+// rebond. update() renvoie true au changement (front), une seule fois.
+class Debouncer {
+public:
+  explicit Debouncer(unsigned long ms) : ms_(ms) {}
+  void reset(bool v) { stable_ = last_ = v; }  // état initial lu au démarrage (pas de faux front)
+  bool update(bool raw, unsigned long now) {
+    if (raw != last_) {
+      last_ = raw;
+      since_ = now;
+    }
+    if (raw == stable_ || now - since_ < ms_) return false;
+    stable_ = raw;
+    return true;
+  }
+  bool state() const { return stable_; }
+
+private:
+  unsigned long ms_, since_ = 0;
+  bool stable_ = false, last_ = false;
+};
+
 // Portail motorisé commandé par impulsion (entrée « pas à pas » de la motorisation, comme la
 // télécommande). Les sécurités restent celles du moteur (cellules, fins de course).
 // État : fin de course « fermé » (obligatoire), « ouvert » (facultatif : openSw = -1 si absent),

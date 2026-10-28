@@ -287,6 +287,38 @@ void test_pilote_arret_force_hors_gel_sous_7C() {
   TEST_ASSERT_EQUAL(Pilote::ECO, piloteSecurite(Pilote::ECO, 3.0f));     // autres ordres intacts
 }
 
+// --- anti-rebond (boutons muraux des volets, fins de course du portail) ---
+void test_rebond_filtre_et_front_unique() {
+  domo::Debouncer b(50);
+  b.reset(false);
+  TEST_ASSERT_FALSE(b.update(true, 1000));   // contact qui rebondit : pas encore stable
+  TEST_ASSERT_FALSE(b.update(false, 1010));
+  TEST_ASSERT_FALSE(b.update(true, 1020));
+  TEST_ASSERT_FALSE(b.update(true, 1060));   // 40 ms seulement depuis le dernier rebond
+  TEST_ASSERT_TRUE(b.update(true, 1071));    // stable 51 ms : appui
+  TEST_ASSERT_TRUE(b.state());
+  TEST_ASSERT_FALSE(b.update(true, 1200));   // bouton maintenu : un seul front
+  TEST_ASSERT_FALSE(b.update(false, 1300));
+  TEST_ASSERT_TRUE(b.update(false, 1351));   // relâché
+  TEST_ASSERT_FALSE(b.state());
+}
+
+void test_rebond_parasite_bref_ignore() {
+  domo::Debouncer b(50);
+  b.reset(false);
+  TEST_ASSERT_FALSE(b.update(true, 1000));   // parasite de 30 ms sur un long câble
+  TEST_ASSERT_FALSE(b.update(false, 1030));
+  TEST_ASSERT_FALSE(b.update(false, 2000));
+  TEST_ASSERT_FALSE(b.state());
+}
+
+void test_rebond_bouton_coince_au_demarrage_sans_front() {
+  domo::Debouncer b(50);
+  b.reset(true);  // bouton déjà enfoncé à la mise sous tension : aucune action
+  TEST_ASSERT_FALSE(b.update(true, 5000));
+  TEST_ASSERT_TRUE(b.state());
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -334,5 +366,8 @@ int main() {
   RUN_TEST(test_pilote_auto_regulation);
   RUN_TEST(test_pilote_auto_sonde_muette_hors_gel);
   RUN_TEST(test_pilote_arret_force_hors_gel_sous_7C);
+  RUN_TEST(test_rebond_filtre_et_front_unique);
+  RUN_TEST(test_rebond_parasite_bref_ignore);
+  RUN_TEST(test_rebond_bouton_coince_au_demarrage_sans_front);
   return UNITY_END();
 }

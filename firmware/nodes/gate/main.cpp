@@ -30,30 +30,20 @@ domo::GateLogic gate(25000);
 unsigned long pulseEnd = 0, lastSend = 0;
 bool dirty = true;
 
-// Entrée filtrée (rebonds) : état stable du contact (true = fermé à la masse)
-struct Debounced {
-  explicit Debounced(int p) : pin(p) {}
-  int pin;
-  bool stable = false, last = false;
-  unsigned long since = 0;
-  bool read() {
-    bool raw = digitalRead(pin) == LOW;
-    if (raw != last) {
-      last = raw;
-      since = millis();
-    }
-    if (raw != stable && millis() - since >= DEBOUNCE_MS) stable = raw;
-    return stable;
-  }
-};
-Debounced closedIn(CLOSED_PIN), openIn(OPEN_PIN);
+domo::Debouncer closedIn(DEBOUNCE_MS), openIn(DEBOUNCE_MS);
+
+// Contact filtré (rebonds) : true = fermé à la masse
+bool lire(domo::Debouncer& d, int pin) {
+  d.update(digitalRead(pin) == LOW, millis());
+  return d.state();
+}
 
 // Position connue ? (toujours, avec les fins de course câblés)
 bool known() { return !extSensor || extPos >= 0; }
 
 domo::GateLogic::State current() {
-  bool closed = extSensor ? extPos == 1 : closedIn.read();
-  int open = (hasOpenSensor && !extSensor) ? (openIn.read() ? 1 : 0) : -1;
+  bool closed = extSensor ? extPos == 1 : lire(closedIn, CLOSED_PIN);
+  int open = (hasOpenSensor && !extSensor) ? (lire(openIn, OPEN_PIN) ? 1 : 0) : -1;
   return gate.state(closed, open, millis());
 }
 
@@ -74,8 +64,8 @@ void setup() {
   hasOpenSensor = prefs.getBool("open_sensor", false);
   extSensor = prefs.getBool("ext_sensor", false);
   gate.setTravel(travelS * 1000UL);
-  closedIn.stable = closedIn.last = digitalRead(CLOSED_PIN) == LOW;  // état initial sans attendre
-  openIn.stable = openIn.last = digitalRead(OPEN_PIN) == LOW;
+  closedIn.reset(digitalRead(CLOSED_PIN) == LOW);  // état initial sans attendre
+  openIn.reset(digitalRead(OPEN_PIN) == LOW);
 
   core.addEntity("cover", "gate", "Portail", "gate");
   core.addEntity("number", "travel_s", "Durée de manœuvre", "duration", "s",

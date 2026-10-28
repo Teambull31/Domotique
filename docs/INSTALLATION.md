@@ -48,7 +48,8 @@
 - [ ] Porte : ouvrir/fermer, l'état suit dans HA en moins de 5 s ; ouverture brève aussi.
 - [ ] Fuite : chiffon mouillé sur la sonde -> alerte urgente, puis rappel à 5 min ; acquitter.
 - [ ] Présence : entrer, rester immobile assis 2 min (doit rester « détecté »), sortir -> extinction.
-- [ ] Volets : ouverture/fermeture complètes, puis position 50 %.
+- [ ] Volets : ouverture/fermeture complètes, puis position 50 %. Boutons muraux : un appui = course
+      complète, un appui pendant la course = arrêt ; essayer aussi **WiFi coupé** (box débranchée).
 - [ ] Puissance : allumer un appareil de puissance connue (bouilloire ~2000 W), la mesure suit.
 - [ ] Bouton d'appel : appui -> voyant allumé 3 s, alerte « Appel à l'aide » sur le téléphone du proche,
       rappel 5 min plus tard ; éteindre « Appel en cours ». Montrer le bouton à la personne âgée.
