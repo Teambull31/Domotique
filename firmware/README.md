@@ -47,9 +47,15 @@ le DevKitC pour `air`, `presence` et `shutters`.
 ## Robustesse (socle DomoCore)
 - **Nœuds secteur** : chien de garde matériel (boucle bloquée 60 s -> redémarrage), redémarrage après
   15 min sans MQTT, LWT `offline`, diagnostic dans HA (signal WiFi, durée de fonctionnement), version du
-  firmware dans la fiche appareil, bouton « Redémarrer », entités redéclarées quand Home Assistant redémarre.
+  firmware dans la fiche appareil, bouton « Redémarrer », entités redéclarées quand Home Assistant redémarre ;
+  connexion MQTT qui ne bloque pas les automatismes (délais courts, essais espacés de 5 à 60 s) ; actionneurs
+  mis en sécurité (`onSafeState`, ex. volet arrêté et position mémorisée) avant une OTA ou un redémarrage.
 - **Nœuds sur pile** (`setSleepy`) : pas de LWT mais `expire_after` (indisponible après 2 réveils manqués),
-  dernier état retenu sur le broker, jamais de portail ni de redémarrage en boucle si le WiFi manque.
+  dernier état retenu sur le broker, jamais de portail ni de redémarrage en boucle si le WiFi manque ;
+  reconnexion directe au point d'accès mémorisé (canal/BSSID en mémoire RTC), envoi raté retenté après
+  1, 2, 4… min (plafonné au battement d'1 h), discovery republiée environ une fois par jour.
+- **Capteur en panne** : mesures publiées à `null` (« inconnu » dans HA, jamais une valeur figée) et entité
+  de diagnostic « Défaut capteur » / « Défaut radar », reprise par l'alerte « Capteur à vérifier ».
 - Réglages sur place depuis HA (Paramètres de l'appareil), sans recompiler : durées de montée/descente des
   volets, délai d'extinction de la lumière, correction de température.
 - Les automatismes critiques (hors-gel, lumière auto, arrêt des volets) tournent en local, sans HA ni WiFi.
