@@ -33,6 +33,14 @@ def automation(alias_start: str) -> dict:
     sys.exit(f"automatisation '{alias_start}' introuvable")
 
 
+def template_sensor(unique_id: str) -> dict:
+    for block in PACKAGE["template"]:
+        for sensor in block.get("sensor", []):
+            if sensor.get("unique_id") == unique_id:
+                return sensor
+    sys.exit(f"capteur {unique_id} introuvable")
+
+
 def trigger_template(auto: dict, trigger_id: str) -> str:
     return next(t["value_template"] for t in auto["trigger"] if t.get("id") == trigger_id)
 
@@ -41,9 +49,12 @@ class Checker:
     def __init__(self, hass: HomeAssistant):
         self.hass, self.failures = hass, 0
 
-    def states(self, values: dict[str, str]) -> None:
+    def states(self, values: dict[str, str], ago: dict[str, float] | None = None) -> None:
+        """ago : depuis combien de secondes l'entité est dans cet état (last_changed)."""
         for entity_id, state in values.items():
-            self.hass.states.async_set(entity_id, state, {"friendly_name": entity_id.split(".")[1]})
+            ts = dt_util.utcnow().timestamp() - (ago or {}).get(entity_id, 0)
+            self.hass.states.async_set(entity_id, state, {"friendly_name": entity_id.split(".")[1]},
+                                       timestamp=ts)
         for group, members in GROUPS.items():  # expand() lit l'attribut entity_id des groupes
             self.hass.states.async_set(f"group.{group}", "off", {"entity_id": members})
 
@@ -76,22 +87,41 @@ async def main() -> int:
                   **dict(zip(presence, states))})
         c.check(name, tpl, expected)
 
-    # --- Capteurs à vérifier ---
-    faults = automation("Senior - capteur muet")
+    # --- Capteurs à vérifier (compteurs : une alerte par nouveau capteur en problème) ---
+    piles_s, muets_s, defauts_s = (template_sensor(u) for u in
+                                   ("senior_piles_faibles", "senior_capteurs_muets", "senior_capteurs_en_defaut"))
     piles = GROUPS["senior_piles"]
     c.states({piles[0]: "85", piles[1]: "15", piles[2]: "unavailable"})
-    c.check("pile : une pile à 15 % déclenche", trigger_template(faults, "pile"), True)
-    c.check("pile : le message nomme la bonne pile", faults["action"][0]["data"]["message"],
-            f"{piles[1].split('.')[1]} (15 %)", {"trigger": {"id": "pile"}})
-    c.states({piles[0]: "85", piles[1]: "100", piles[2]: "unavailable"})
-    c.check("pile : 'indisponible' n'est pas une pile faible", trigger_template(faults, "pile"), False)
-    c.check("pile : 100 % ne déclenche pas (pas de comparaison de texte)", trigger_template(faults, "pile"), False)
+    c.check("piles : une pile à 15 % comptée", piles_s["state"], 1)
+    c.check("piles : le nom et le niveau sont listés", piles_s["attributes"]["noms"], f"{piles[1].split('.')[1]} (15 %)")
+    c.states({piles[0]: "100", piles[1]: "9", piles[2]: "18"})
+    c.check("piles : 2 faibles, '100' non compté (pas de comparaison de texte)", piles_s["state"], 2)
+
+    capteurs = GROUPS["senior_capteurs_pile"]
+    c.states({capteurs[0]: "unavailable", capteurs[1]: "unavailable", capteurs[2]: "off"},
+             ago={capteurs[0]: 2 * 3600, capteurs[1]: 600})
+    c.check("muets : seul le capteur indisponible depuis plus d'1 h compte", muets_s["state"], 1)
 
     defauts = GROUPS["senior_defauts"]
-    c.states({d: "off" for d in defauts})
-    c.check("défaut : aucun défaut", trigger_template(faults, "defaut"), False)
-    c.states({**{d: "off" for d in defauts}, defauts[0]: "on"})
-    c.check("défaut : un radar en défaut déclenche", trigger_template(faults, "defaut"), True)
+    c.states({**{d: "off" for d in defauts}, defauts[0]: "on", defauts[1]: "on"},
+             ago={defauts[0]: 3600, defauts[1]: 60})
+    c.check("défauts : seul le défaut de plus de 10 min compte", defauts_s["state"], 1)
+
+    faults = automation("Senior - capteur muet")
+    cond = faults["condition"][0]["value_template"]
+
+    def trig(entity, frm, to, noms=""):
+        hass.states.async_set(entity, to, {"noms": noms})
+        to_state = hass.states.get(entity)
+        hass.states.async_set(entity, frm)
+        return {"trigger": {"entity_id": entity, "from_state": hass.states.get(entity), "to_state": to_state}}
+
+    c.check("alerte : 2e pile faible (1 -> 2) notifiée", cond, True, trig("sensor.piles_faibles", "1", "2"))
+    c.check("alerte : pile remplacée (2 -> 1) silencieuse", cond, False, trig("sensor.piles_faibles", "2", "1"))
+    c.check("alerte : redémarrage de HA (inconnu -> 1) silencieux", cond, False,
+            trig("sensor.piles_faibles", "unknown", "1"))
+    c.check("alerte : message", faults["action"][0]["data"]["message"], "Pile faible : porte (12 %)",
+            trig("sensor.piles_faibles", "0", "1", "porte (12 %)"))
 
     # --- Chaleur / froid ---
     temps = automation("Senior - température")

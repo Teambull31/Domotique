@@ -93,6 +93,9 @@ views:
       - type: entities
         title: Entretien des capteurs
         entities:
+          - entity: sensor.piles_faibles
+          - entity: sensor.capteurs_sur_pile_muets
+          - entity: sensor.capteurs_en_defaut
           - entity: sensor.door_entree_batterie
             name: Pile porte d'entrée
           - entity: sensor.leak_cuisine_batterie

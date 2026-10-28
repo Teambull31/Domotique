@@ -87,6 +87,46 @@ group:
       - sensor.climate_chambre_temperature
 
 template:
+  # Compteurs de capteurs à vérifier (une alerte à CHAQUE nouveau capteur en problème, pas seulement
+  # au premier : une 2e pile faible des semaines après la 1re doit aussi être signalée).
+  - sensor:
+      - name: "Piles faibles"
+        unique_id: senior_piles_faibles
+        icon: mdi:battery-alert
+        state: >
+          {{ expand('group.senior_piles') | map(attribute='state') | select('is_number')
+             | map('float') | select('lt', 20) | list | count }}
+        attributes:
+          noms: >
+            {% set ns = namespace(l=[]) %}
+            {% for e in expand('group.senior_piles') if e.state | is_number and e.state | float < 20 %}
+              {% set ns.l = ns.l + [e.name ~ ' (' ~ e.state ~ ' %)'] %}
+            {% endfor %}
+            {{ ns.l | join(', ') }}
+      # + expire_after (2 h 05) côté capteur : environ 3 h sans nouvelles
+      - name: "Capteurs sur pile muets"
+        unique_id: senior_capteurs_muets
+        icon: mdi:access-point-network-off
+        state: >
+          {{ expand('group.senior_capteurs_pile') | selectattr('state', 'eq', 'unavailable')
+             | selectattr('last_changed', 'lt', now() - timedelta(hours=1)) | list | count }}
+        attributes:
+          noms: >
+            {{ expand('group.senior_capteurs_pile') | selectattr('state', 'eq', 'unavailable')
+               | selectattr('last_changed', 'lt', now() - timedelta(hours=1)) | map(attribute='name') | join(', ') }}
+      # radar en panne (alerte d'inactivité aveugle), sonde morte (thermostat coupé par sécurité),
+      # compteur ou capteur d'air muet ; signalé après 10 min
+      - name: "Capteurs en défaut"
+        unique_id: senior_capteurs_en_defaut
+        icon: mdi:alert-circle-outline
+        state: >
+          {{ expand('group.senior_defauts') | selectattr('state', 'eq', 'on')
+             | selectattr('last_changed', 'lt', now() - timedelta(minutes=10)) | list | count }}
+        attributes:
+          noms: >
+            {{ expand('group.senior_defauts') | selectattr('state', 'eq', 'on')
+               | selectattr('last_changed', 'lt', now() - timedelta(minutes=10)) | map(attribute='name') | join(', ') }}
+
   # Horodatage de la dernière activité réelle : quelqu'un entre dans une pièce surveillée, quitte la
   # dernière pièce occupée (il était là jusqu'à cet instant : sans ce cas, 8 h passées au salon
   # compteraient depuis l'arrivée et déclencheraient une fausse alerte en partant), ou ouvre la porte.
@@ -237,42 +277,22 @@ automation:
 
   - alias: "Senior - capteur muet, en défaut ou batterie faible"
     trigger:
-      - platform: template
-        id: pile
+      - platform: state
+        entity_id: [sensor.piles_faibles, sensor.capteurs_sur_pile_muets, sensor.capteurs_en_defaut]
+    condition:
+      # un capteur de plus en problème (pas au redémarrage de HA : from inconnu)
+      - condition: template
         value_template: >
-          {{ expand('group.senior_piles') | map(attribute='state') | select('is_number')
-             | map('float') | select('lt', 20) | list | count > 0 }}
-      # + expire_after (2 h 05) côté capteur ≈ 3 h sans nouvelles
-      - platform: template
-        id: muet
-        value_template: >
-          {{ expand('group.senior_capteurs_pile') | selectattr('state', 'eq', 'unavailable') | list | count > 0 }}
-        for: "01:00:00"
-      # radar en panne (alerte d'inactivité aveugle), sonde morte (thermostat coupé par sécurité,
-      # alerte chaud/froid aveugle), compteur ou capteur d'air muet
-      - platform: template
-        id: defaut
-        value_template: >
-          {{ expand('group.senior_defauts') | selectattr('state', 'eq', 'on') | list | count > 0 }}
-        for: "00:10:00"
+          {{ trigger.from_state is not none
+             and trigger.from_state.state not in ['unknown', 'unavailable']
+             and trigger.to_state.state | int(0) > trigger.from_state.state | int(0) }}
     action:
       - service: notify.mobile_app_proche
         data:
           title: "Capteur à vérifier"
           message: >
-            {% if trigger.id == 'pile' %}
-              {% set ns = namespace(l=[]) %}
-              {% for e in expand('group.senior_piles') if e.state | is_number and e.state | float < 20 %}
-                {% set ns.l = ns.l + [e.name ~ ' (' ~ e.state ~ ' %)'] %}
-              {% endfor %}
-              Pile faible : {{ ns.l | join(', ') }}.
-            {% elif trigger.id == 'muet' %}
-              Hors ligne depuis plus de 3 h : {{ expand('group.senior_capteurs_pile')
-                | selectattr('state', 'eq', 'unavailable') | map(attribute='name') | join(', ') }}.
-            {% else %}
-              En défaut : {{ expand('group.senior_defauts')
-                | selectattr('state', 'eq', 'on') | map(attribute='name') | join(', ') }}.
-            {% endif %}
+            {% set libelle = {'sensor.piles_faibles': 'Pile faible', 'sensor.capteurs_sur_pile_muets': 'Hors ligne depuis plus de 3 h', 'sensor.capteurs_en_defaut': 'En défaut'} %}
+            {{ libelle[trigger.entity_id] }} : {{ trigger.to_state.attributes.noms }}.
 
   # Nécessite un nœud "power" (pince PZEM) sur le circuit de cuisson, pièce "cuisson".
   - alias: "Senior - plaque de cuisson allumée longtemps"
