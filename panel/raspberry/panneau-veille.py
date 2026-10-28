@@ -5,13 +5,18 @@ Le premier contact sur un écran tamisé ne fait que le réveiller : il n'est PA
 bord (périphériques d'entrée « saisis » pendant la veille), donc pas de lumière allumée ou de portail
 ouvert par erreur en réveillant l'écran. Niveaux plus bas la nuit.
 Écrans à rétroéclairage pilotable (/sys/class/backlight : DSI, dont l'écran officiel Raspberry Pi).
+Alerte (facultatif, HA_URL + HA_TOKEN) : tant que l'« État de la maison » n'est pas « Tout va bien »
+(fuite, portail ouvert, appel…), l'écran reste à pleine luminosité pour que le problème se voie.
 Réglages : /etc/default/panneau-veille (voir install-kiosk.sh). Lancé par le service panneau-veille.
 """
 import fcntl
 import glob
+import json
 import os
 import select
+import threading
 import time
+import urllib.request
 
 EVIOCGRAB = 0x40044590  # _IOW('E', 0x90, int) : accès exclusif à un périphérique d'entrée
 
@@ -23,6 +28,9 @@ DEFAUTS = {
     "VEILLE_NUIT": 3,
     "NUIT_DEBUT": 22,     # heure de début de nuit
     "NUIT_FIN": 7,
+    "HA_URL": "",         # ex. http://192.168.1.10:8123 (vide = pas de réveil sur alerte)
+    "HA_TOKEN": "",       # jeton longue durée de l'utilisateur « panneau » (profil HA > Sécurité)
+    "HA_ENTITE": "sensor.etat_de_la_maison",
 }
 
 
@@ -32,8 +40,14 @@ def lire_reglages(chemin="/etc/default/panneau-veille"):
         with open(chemin, encoding="utf-8") as f:
             for ligne in f:
                 cle, _, val = ligne.split("#")[0].partition("=")
-                if cle.strip() in conf and val.strip().isdigit():
-                    conf[cle.strip()] = int(val.strip())
+                cle, val = cle.strip(), val.strip().strip('"').strip("'")
+                if cle not in conf:
+                    continue
+                if isinstance(DEFAUTS[cle], int):
+                    if val.isdigit():
+                        conf[cle] = int(val)
+                else:
+                    conf[cle] = val
     except FileNotFoundError:
         pass
     return conf
@@ -56,8 +70,13 @@ class Veille:
     def __init__(self, conf, maintenant):
         self.conf, self.dernier_contact, self.en_veille, self.saisi = conf, maintenant, False, False
 
-    def tour(self, maintenant, contact, heure):
+    def tour(self, maintenant, contact, heure, alerte=False):
         """Renvoie (luminosité % ou None, saisir: True/False/None)."""
+        if alerte:  # problème dans la maison : écran éclairé et utilisable tant qu'il dure
+            self.dernier_contact = maintenant
+            if self.en_veille:
+                self.en_veille, self.saisi = False, False
+                return niveau(True, heure, self.conf), False
         if contact:
             self.dernier_contact = maintenant
             if self.en_veille:  # réveil : ce contact reste saisi (non transmis)
@@ -71,6 +90,35 @@ class Veille:
             self.en_veille, self.saisi = True, True
             return niveau(False, heure, self.conf), True
         return None, None
+
+
+def maison_en_alerte(conf):
+    """True si l'« État de la maison » signale un problème. HA injoignable ou non configuré : False
+    (l'écran ne doit pas rester allumé pour rien)."""
+    if not conf["HA_URL"] or not conf["HA_TOKEN"]:
+        return False
+    req = urllib.request.Request(
+        f"{conf['HA_URL'].rstrip('/')}/api/states/{conf['HA_ENTITE']}",
+        headers={"Authorization": f"Bearer {conf['HA_TOKEN']}"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as rep:
+            etat = json.load(rep).get("state", "")
+    except (OSError, ValueError):
+        return False
+    return etat not in ("Tout va bien", "unknown", "unavailable", "")
+
+
+class Surveillance(threading.Thread):
+    """Interroge HA toutes les 30 s, sans jamais bloquer la boucle du toucher."""
+
+    def __init__(self, conf, periode=30):
+        super().__init__(daemon=True)
+        self.conf, self.periode, self.alerte = conf, periode, False
+
+    def run(self):
+        while True:
+            self.alerte = maison_en_alerte(self.conf)
+            time.sleep(self.periode)
 
 
 def appliquer_luminosite(pct, motif="/sys/class/backlight/*"):
@@ -112,6 +160,8 @@ def main():
     conf = lire_reglages(REGLAGES)
     fds = ouvrir_entrees(ENTREES)
     veille = Veille(conf, time.monotonic())
+    surveillance = Surveillance(conf)
+    surveillance.start()
     appliquer_luminosite(niveau(True, time.localtime().tm_hour, conf), RETRO)
     dernier_reglage = time.monotonic()
     while True:
@@ -132,7 +182,7 @@ def main():
                 fds = ouvrir_entrees(ENTREES)
                 break
         heure = time.localtime().tm_hour
-        pct, saisie = veille.tour(time.monotonic(), bool(prets), heure)
+        pct, saisie = veille.tour(time.monotonic(), bool(prets), heure, surveillance.alerte)
         if saisie is not None:
             saisir(fds, saisie)
         if pct is not None:

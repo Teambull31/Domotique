@@ -74,8 +74,13 @@ VEILLE_JOUR=15    # assez pour lire l'état de la maison de loin
 VEILLE_NUIT=3
 NUIT_DEBUT=22
 NUIT_FIN=7
+# Réveil sur alerte (facultatif) : écran éclairé tant que l'État de la maison signale un problème.
+# Jeton : profil de l'utilisateur « panneau » dans HA > Sécurité > Jetons d'accès longue durée.
+#HA_URL=http://192.168.1.10:8123
+#HA_TOKEN=
 CONF
 fi
+chmod 600 /etc/default/panneau-veille  # contient le jeton HA
 cat >/etc/systemd/system/panneau-veille.service <<'UNIT'
 [Unit]
 Description=Veille de l'écran du panneau (tamisé sans contact, réveil au toucher)

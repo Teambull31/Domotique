@@ -41,6 +41,9 @@ fonctionne aussi, mais reste à pleine luminosité (réglage sur l'écran lui-m�
    l'état de la maison reste lisible de loin) ; il revient au toucher, et ce premier contact **ne
    déclenche rien** (pas de lumière allumée ni de portail ouvert en réveillant l'écran). Délai et niveaux
    dans `/etc/default/panneau-veille`, puis `sudo systemctl restart panneau-veille`.
+   **Réveil sur alerte** (conseillé) : renseigner `HA_URL` et `HA_TOKEN` (jeton longue durée de
+   l'utilisateur *panneau*) dans ce même fichier : tant que l'état de la maison n'est pas « Tout va
+   bien » (fuite, portail ouvert, appel…), l'écran reste allumé et le problème se voit de loin.
 3. **Connexion automatique** du panneau à HA (pas de clavier à l'écran) : dans `configuration.yaml`,
    autoriser **la seule adresse IP du Pi** (réservée dans la box) à se connecter en tant que *panneau* :
    ```yaml
