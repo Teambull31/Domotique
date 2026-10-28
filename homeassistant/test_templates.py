@@ -4,6 +4,7 @@ Usage : python homeassistant/test_templates.py   (prérequis : pip install homea
 check_config ne valide que la forme du YAML ; ce test vérifie le résultat des templates.
 """
 import asyncio
+import shutil
 import sys
 import tempfile
 from datetime import timedelta
@@ -12,10 +13,12 @@ from unittest.mock import patch
 
 import yaml
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.template import Template
+from homeassistant.helpers.template import Template, async_load_custom_templates
 import homeassistant.util.dt as dt_util
 
-PACKAGE = yaml.safe_load((Path(__file__).parent / "packages" / "senior_care.yaml").read_text(encoding="utf-8"))
+HERE = Path(__file__).parent
+PACKAGE = yaml.safe_load((HERE / "packages" / "senior_care.yaml").read_text(encoding="utf-8"))
+MAISON = yaml.safe_load((HERE / "packages" / "maison.yaml").read_text(encoding="utf-8"))
 GROUPS = {name: cfg["entities"] for name, cfg in PACKAGE["group"].items()}
 
 
@@ -70,7 +73,10 @@ class Checker:
 
 
 async def main() -> int:
-    hass = HomeAssistant(tempfile.mkdtemp())
+    cfgdir = tempfile.mkdtemp()
+    shutil.copytree(HERE / "custom_templates", Path(cfgdir) / "custom_templates")
+    hass = HomeAssistant(cfgdir)
+    await async_load_custom_templates(hass)  # macros (maison.jinja) comme dans un vrai HA
     c = Checker(hass)
     now = dt_util.utcnow()
     presence = GROUPS["senior_presence"]
@@ -201,6 +207,32 @@ async def main() -> int:
     c.check("bilan : température disponible citée", report, "20.5 °C")
     c.states({"sensor.presence_detectee_aujourd_hui": "unknown", "sensor.derniere_activite_a_la_maison": "unknown"})
     c.check("bilan : sans données, pas d'erreur", report, "Dernière activité : inconnue")
+
+    # --- Package maison : coût et état de la maison ---
+    maison_sensors = {s["unique_id"]: s for s in MAISON["template"][0]["sensor"]}
+    c.states({"sensor.electricite_aujourd_hui": "12.4", "input_number.maison_tarif_kwh": "0.25"})
+    c.check("maison : coût du jour = kWh x tarif", maison_sensors["maison_cout_jour"]["state"], 3.1)
+
+    def maison(states):
+        for e in list(hass.states.async_entity_ids()):  # repartir d'une maison vide
+            hass.states.async_remove(e)
+        for entity_id, (state, attrs) in states.items():
+            hass.states.async_set(entity_id, state, {"friendly_name": entity_id.split(".")[1], **attrs})
+
+    etat = maison_sensors["maison_etat"]
+    maison({"binary_sensor.leak_cuisine_fuite": ("off", {"device_class": "moisture"}),
+            "cover.gate_entree_portail": ("closed", {"device_class": "gate"}),
+            "sensor.door_entree_batterie": ("80", {"device_class": "battery"})})
+    c.check("maison : rien à signaler -> 'Tout va bien'", etat["state"], "Tout va bien")
+    maison({"binary_sensor.leak_cuisine_fuite": ("on", {"device_class": "moisture"}),
+            "binary_sensor.fuite_d_eau_quelque_part": ("on", {"device_class": "moisture"}),
+            "cover.gate_entree_portail": ("open", {"device_class": "gate"}),
+            "sensor.door_entree_batterie": ("12", {"device_class": "battery"}),
+            "sensor.climate_salon_temperature": ("21", {"device_class": "temperature"})})
+    c.check("maison : fuite + portail + pile -> '3 points' (groupe fuite non compté 2 fois)",
+            etat["state"], "3 points à vérifier")
+    c.check("maison : le détail nomme la fuite", etat["attributes"]["points"], "Fuite : leak_cuisine_fuite")
+    c.check("maison : le détail nomme la pile", etat["attributes"]["points"], "Pile faible : door_entree_batterie (12 %)")
 
     await hass.async_stop(force=True)
     print("TOUS OK" if not c.failures else f"{c.failures} ÉCHEC(S)")

@@ -8,6 +8,7 @@ cfg="$(mktemp -d)"
 trap 'rm -rf "$cfg"' EXIT
 mkdir -p "$cfg/packages"
 cp "$here"/packages/*.yaml "$cfg/packages/"
+mkdir -p "$cfg/custom_templates" && cp "$here"/custom_templates/*.jinja "$cfg/custom_templates/"
 printf 'homeassistant:\n  packages: !include_dir_named packages\n' > "$cfg/configuration.yaml"
 out="$(hass --script check_config -c "$cfg" 2>&1 || true)"
 if grep -E "ERROR|Invalid config|Failed config" <<<"$out"; then

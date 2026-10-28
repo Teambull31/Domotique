@@ -1,0 +1,84 @@
+# Package Home Assistant "maison" : consommation, état général et portail. Indépendant du package
+# senior_care (utilisable chez soi comme chez un proche). Copier dans /config/packages/.
+# ADAPTER : sensor.power_tableau_energie (nœud "power" au tableau électrique, pièce "tableau"),
+# le tarif (Paramètres > Entités > Tarif de l'électricité) et le service de notification.
+
+input_number:
+  maison_tarif_kwh:
+    name: Tarif de l'électricité (€/kWh)
+    min: 0
+    max: 1
+    step: 0.0001
+    mode: box
+    initial: 0.25  # à remplacer par le prix TTC du kWh du contrat
+    unit_of_measurement: "€/kWh"
+    icon: mdi:currency-eur
+
+# Compteurs remis à zéro chaque jour / chaque mois, à partir du compteur total du PZEM.
+# Identifiants tirés du NOM (vérifié en démarrant HA) : sensor.electricite_aujourd_hui, sensor.electricite_ce_mois_ci
+utility_meter:
+  energie_aujourd_hui:
+    name: Électricité aujourd'hui
+    unique_id: maison_energie_jour
+    source: sensor.power_tableau_energie
+    cycle: daily
+  energie_ce_mois:
+    name: Électricité ce mois-ci
+    unique_id: maison_energie_mois
+    source: sensor.power_tableau_energie
+    cycle: monthly
+
+template:
+  - sensor:
+      - name: "Coût de l'électricité aujourd'hui"
+        unique_id: maison_cout_jour
+        unit_of_measurement: "€"
+        device_class: monetary
+        icon: mdi:cash
+        state: >
+          {% set kwh = states('sensor.electricite_aujourd_hui') | float(none) %}
+          {{ (kwh * states('input_number.maison_tarif_kwh') | float(0)) | round(2) if kwh is not none else none }}
+        availability: "{{ states('sensor.electricite_aujourd_hui') | is_number }}"
+      - name: "Coût de l'électricité ce mois-ci"
+        unique_id: maison_cout_mois
+        unit_of_measurement: "€"
+        device_class: monetary
+        icon: mdi:cash-multiple
+        state: >
+          {% set kwh = states('sensor.electricite_ce_mois_ci') | float(none) %}
+          {{ (kwh * states('input_number.maison_tarif_kwh') | float(0)) | round(2) if kwh is not none else none }}
+        availability: "{{ states('sensor.electricite_ce_mois_ci') | is_number }}"
+
+      # État de la maison en une phrase, pour l'écran d'accueil (tablette, panneau mural).
+      # Liste calculée par la macro custom_templates/maison.jinja (à copier dans /config/custom_templates/),
+      # appelée par l'état ET par le détail : jamais « Tout va bien » avec une fuite dans le détail.
+      - name: "État de la maison"
+        unique_id: maison_etat
+        icon: >
+          {% from 'maison.jinja' import points_a_verifier %}
+          {{ 'mdi:home-alert' if points_a_verifier() | from_json | count else 'mdi:home-heart' }}
+        state: >
+          {% from 'maison.jinja' import points_a_verifier %}
+          {% set n = points_a_verifier() | from_json | count %}
+          {{ 'Tout va bien' if n == 0 else (n ~ ' point' ~ ('s' if n > 1 else '') ~ ' à vérifier') }}
+        attributes:
+          points: >
+            {% from 'maison.jinja' import points_a_verifier %}
+            {{ points_a_verifier() | from_json }}
+
+automation:
+  - alias: "Maison - portail resté ouvert"
+    trigger:
+      - platform: template
+        value_template: >
+          {{ states.cover | selectattr('attributes.device_class', 'defined')
+             | selectattr('attributes.device_class', 'eq', 'gate') | selectattr('state', 'eq', 'open') | list | count > 0 }}
+        for: "00:10:00"
+    action:
+      - service: notify.notify  # tous les téléphones de l'app HA ; remplacer par notify.mobile_app_xxx
+        data:
+          title: "Portail ouvert depuis 10 min"
+          message: >
+            {{ states.cover | selectattr('attributes.device_class', 'defined')
+               | selectattr('attributes.device_class', 'eq', 'gate') | selectattr('state', 'eq', 'open')
+               | map(attribute='name') | join(', ') }} : penser à le refermer (bouton sur le panneau).

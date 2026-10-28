@@ -1,0 +1,27 @@
+{# Points à vérifier dans la maison, repérés d'après le type des capteurs (tous les nœuds, sans
+   configuration par site). Renvoie une liste JSON : points_a_verifier() | from_json #}
+{% macro points_a_verifier() %}
+{%- set ns = namespace(l=[]) -%}
+{%- set bs = states.binary_sensor | selectattr('attributes.device_class', 'defined') | list -%}
+{%- for e in bs | selectattr('attributes.device_class', 'eq', 'moisture') | selectattr('state', 'eq', 'on')
+     if e.entity_id != 'binary_sensor.fuite_d_eau_quelque_part' -%}
+  {%- set ns.l = ns.l + ['Fuite : ' ~ e.name] -%}
+{%- endfor -%}
+{%- for e in bs | selectattr('attributes.device_class', 'in', ['door', 'window', 'garage_door', 'opening'])
+     | selectattr('state', 'eq', 'on') -%}
+  {%- set ns.l = ns.l + ['Ouvert : ' ~ e.name] -%}
+{%- endfor -%}
+{%- for e in states.cover | selectattr('attributes.device_class', 'defined')
+     | selectattr('attributes.device_class', 'in', ['gate', 'garage'])
+     | rejectattr('state', 'in', ['closed', 'unknown', 'unavailable']) -%}
+  {%- set ns.l = ns.l + ['Ouvert : ' ~ e.name] -%}
+{%- endfor -%}
+{%- for e in bs | selectattr('attributes.device_class', 'eq', 'problem') | selectattr('state', 'eq', 'on') -%}
+  {%- set ns.l = ns.l + ['En panne : ' ~ e.name] -%}
+{%- endfor -%}
+{%- for e in states.sensor | selectattr('attributes.device_class', 'defined')
+     | selectattr('attributes.device_class', 'eq', 'battery') if e.state | is_number and e.state | float < 20 -%}
+  {%- set ns.l = ns.l + ['Pile faible : ' ~ e.name ~ ' (' ~ e.state ~ ' %)'] -%}
+{%- endfor -%}
+{{ ns.l | to_json }}
+{%- endmacro %}
