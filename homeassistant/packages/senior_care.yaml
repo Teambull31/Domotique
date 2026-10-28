@@ -462,15 +462,33 @@ automation:
       - service: notify.proche_aidant
         data:
           title: "Bilan de la journée"
+          # Une information par ligne ; rappel chaque soir de ce qui reste à faire (une pile faible
+          # n'est notifiée qu'une fois, au moment où elle le devient).
           message: >
-            {% set h = states('sensor.presence_detectee_aujourd_hui') | float(0) %}
-            {% set last = states('sensor.derniere_activite_a_la_maison') | as_datetime %}
-            Présence détectée : {{ (h | int) }} h {{ '%02d' % ((h % 1) * 60) | int }}.
-            Porte d'entrée ouverte {{ states('sensor.ouvertures_de_la_porte_aujourd_hui') | int(0) }} fois.
-            Dernière activité : {{ as_local(last).strftime('%H:%M') if last else 'inconnue' }}.
-            {% set ns = namespace(l=[]) %}
-            {% for e in expand('group.senior_temperatures') if e.state | is_number %}
-              {% set ns.l = ns.l + [e.name ~ ' ' ~ e.state ~ ' °C'] %}
-            {% endfor %}
-            {{ ('Températures : ' ~ ns.l | join(', ') ~ '.') if ns.l else '' }}
-            {{ 'Alertes désactivées.' if is_state('input_boolean.senior_alerts_enabled', 'off') else '' }}
+            {%- from 'maison.jinja' import piles_faibles, capteurs_muets, capteurs_en_defaut -%}
+            {%- set h = states('sensor.presence_detectee_aujourd_hui') | float(0) -%}
+            {%- set last = states('sensor.derniere_activite_a_la_maison') | as_datetime -%}
+            {%- set l = namespace(l=[
+                 'Présence détectée : ' ~ (h | int) ~ ' h ' ~ '%02d' % ((h % 1) * 60) | int ~ '.',
+                 "Porte d'entrée ouverte " ~ states('sensor.ouvertures_de_la_porte_aujourd_hui') | int(0) ~ ' fois.',
+                 'Dernière activité : ' ~ (as_local(last).strftime('%H:%M') if last else 'inconnue') ~ '.']) -%}
+            {%- set ns = namespace(t=[]) -%}
+            {%- for e in expand('group.senior_temperatures') if e.state | is_number -%}
+              {%- set ns.t = ns.t + [e.name ~ ' ' ~ e.state ~ ' °C'] -%}
+            {%- endfor -%}
+            {%- if ns.t %}{% set l.l = l.l + ['Températures : ' ~ ns.t | join(', ') ~ '.'] %}{% endif -%}
+            {%- set av = namespace(l=[]) -%}
+            {%- for p in piles_faibles() | from_json %}{% set av.l = av.l + ['pile faible : ' ~ p] %}{% endfor -%}
+            {%- for p in capteurs_muets() | from_json %}{% set av.l = av.l + ['hors ligne : ' ~ p] %}{% endfor -%}
+            {%- for p in capteurs_en_defaut() | from_json %}{% set av.l = av.l + ['en défaut : ' ~ p] %}{% endfor -%}
+            {%- if integration_entities('mqtt') | count == 0 -%}
+              {%- set l.l = l.l + ["Aucun capteur trouvé : vérifier l'intégration MQTT de Home Assistant."] -%}
+            {%- elif av.l -%}
+              {%- set l.l = l.l + ['À vérifier : ' ~ av.l | join(' ; ') ~ '.'] -%}
+            {%- else -%}
+              {%- set l.l = l.l + ['Capteurs : tous fonctionnent.'] -%}
+            {%- endif -%}
+            {%- if is_state('input_boolean.senior_alerts_enabled', 'off') -%}
+              {%- set l.l = l.l + ['Alertes désactivées.'] -%}
+            {%- endif -%}
+            {{ l.l | join('\n') }}

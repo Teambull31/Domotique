@@ -274,6 +274,28 @@ async def main() -> int:
     c.check("bilan : température disponible citée", report, "20.5 °C")
     c.states({"sensor.presence_detectee_aujourd_hui": "unknown", "sensor.derniere_activite_a_la_maison": "unknown"})
     c.check("bilan : sans données, pas d'erreur", report, "Dernière activité : inconnue")
+    c.check("bilan : aucun capteur trouvé -> le dire (intégration MQTT en panne)", report, "Aucun capteur trouvé")
+    for eid in ("sensor.leak_cuisine_batterie", "sensor.door_entree_batterie",
+                "binary_sensor.presence_salon_defaut_radar"):
+        sources[eid] = {"domain": "mqtt", "custom_component": False}
+    c.states({"sensor.leak_cuisine_batterie": "80", "sensor.door_entree_batterie": "95",
+              "binary_sensor.presence_salon_defaut_radar": "off"})
+    for eid, classe in (("sensor.leak_cuisine_batterie", "battery"), ("sensor.door_entree_batterie", "battery"),
+                        ("binary_sensor.presence_salon_defaut_radar", "problem")):
+        etat = hass.states.get(eid)
+        hass.states.async_set(eid, etat.state, {**etat.attributes, "device_class": classe})
+    c.check("bilan : rien à vérifier -> le dire", report, "Capteurs : tous fonctionnent")
+    hass.states.async_set("sensor.leak_cuisine_batterie", "12", {"device_class": "battery",
+                                                                 "friendly_name": "leak_cuisine_batterie"})
+    hass.states.async_set("binary_sensor.presence_salon_defaut_radar", "on",
+                          {"device_class": "problem", "friendly_name": "presence_salon_defaut_radar"},
+                          timestamp=dt_util.utcnow().timestamp() - 3600)
+    c.check("bilan : rappel chaque soir de la pile faible", report, "pile faible : leak_cuisine_batterie (12 %)")
+    c.check("bilan : rappel du défaut", report, "en défaut : presence_salon_defaut_radar")
+    c.check("bilan : une information par ligne", report, "Dernière activité : inconnue.\nTempératures")
+    hass.states.async_set("input_boolean.senior_alerts_enabled", "off")
+    c.check("bilan : alertes coupées rappelées", report, "\nAlertes désactivées.")
+    sources.clear()
 
     # --- Package maison : coût et état de la maison ---
     maison_sensors = {s["unique_id"]: s for s in MAISON["template"][0]["sensor"]}
