@@ -47,6 +47,8 @@
 - [ ] Présence : entrer, rester immobile assis 2 min (doit rester « détecté »), sortir -> extinction.
 - [ ] Volets : ouverture/fermeture complètes, puis position 50 %.
 - [ ] Puissance : allumer un appareil de puissance connue (bouilloire ~2000 W), la mesure suit.
+- [ ] Bouton d'appel : appui -> voyant allumé 3 s, alerte « Appel à l'aide » sur le téléphone du proche,
+      rappel 5 min plus tard ; éteindre « Appel en cours ». Montrer le bouton à la personne âgée.
 - [ ] Pile : niveau de batterie cohérent (accu chargé ≈ 100 %).
 - [ ] Panne simulée : débrancher le radar (ou une sonde de température) -> « Défaut » en 10 s dans HA,
       notification « Capteur à vérifier » après 10 min ; rebrancher.

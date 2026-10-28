@@ -180,6 +180,17 @@ async def main() -> int:
     c.states({"binary_sensor.activite_recente_a_la_maison": "on"})
     c.check("inactivité : fin par activité -> rassurer", alert_cfg["done_message"], "Activité de nouveau détectée")
 
+    # --- Bouton d'appel ---
+    appel_msg = automation("Senior - bouton d'appel")["action"][1]["data"]["message"]
+    boutons = GROUPS["senior_boutons_appel"]
+    c.states({boutons[0]: "on"})
+    c.check("appel : la notification nomme le bouton", appel_msg, boutons[0].split(".")[1])
+    c.states({boutons[0]: "off"})
+    c.check("appel : nom inconnu -> libellé par défaut", appel_msg, "Bouton d'appel")
+    c.states({"input_boolean.senior_appel_en_cours": "on"}, ago={"input_boolean.senior_appel_en_cours": 600})
+    c.check("appel : le rappel donne l'heure de l'appui", PACKAGE["alert"]["appel"]["message"],
+            dt_util.as_local(dt_util.utcnow() - timedelta(seconds=600)).strftime("%H:%M"))
+
     # --- Bilan quotidien ---
     report = automation("Senior - bilan quotidien")["action"][0]["data"]["message"]
     c.states({"sensor.presence_detectee_aujourd_hui": "6.5", "sensor.ouvertures_de_la_porte_aujourd_hui": "3",

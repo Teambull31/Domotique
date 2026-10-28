@@ -29,7 +29,7 @@ Tout est compilé et testé sur PC (logique) ; **rien n'est encore validé sur d
       oubliée, chaleur/froid, CO2, piles et capteurs en panne
 - [x] Tableau de bord du proche aidant, bilan quotidien du soir, script de test des alertes
 - [x] Un seul endroit à adapter par site (groupes), templates testés avec le moteur de HA
-- [ ] `call` : bouton d'appel (ESP32 sur pile) — complément, **pas** une téléassistance certifiée
+- [x] `call` : bouton d'appel (ESP32 sur pile, voyant de confirmation) — complément, **pas** une téléassistance certifiée
 
 ## Phase 4 — Énergie
 - [ ] Délestage / heures creuses : lave-linge, chauffe-eau (relais certifiés)

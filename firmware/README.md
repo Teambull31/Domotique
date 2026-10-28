@@ -6,6 +6,7 @@
 | `air` | SCD40 + PMS5003 | CO2, particules (PMS en veille entre deux mesures) |
 | `power` | PZEM-004T v3 | tension, courant, puissance, énergie (kWh) |
 | `door` | contact reed, pile | ouverture porte/fenêtre (deep sleep, ouverture brève non perdue) |
+| `call` | bouton + voyant, pile | bouton d'appel : alerte au proche répétée jusqu'à prise en compte, voyant de confirmation |
 | `leak` | sonde d'eau, pile | fuite (deep sleep, confirmée sur 2 lectures) |
 | `presence` | LD2410 + relais | présence (même immobile) + lumière auto locale ; forçage HA respecté tant que la pièce est occupée ; défaut radar signalé |
 | `shutters` | 2 relais | volet roulant interverrouillé, position 0-100 % estimée et mémorisée |
@@ -25,6 +26,7 @@ Chaque nœud existe pour 3 cartes : `<nœud>` (ESP32-DevKitC), `<nœud>-c3` (ESP
 | Relais chauffage | 25 | 0 | 4 |
 | Contact porte / sonde fuite (réveil) | 33 | 3 | 6 |
 | Mesure pile (ADC) | 34 | 1 | 7 |
+| Voyant (bouton d'appel) | 26 | 4 | 4 |
 | Bouton BOOT (configuration) | 0 | 9 | 0 |
 
 Source : `lib/DomoCore/src/DomoPins.h`. Sur C3, le réveil deep sleep n'est possible que sur GPIO0..5 et le
@@ -60,7 +62,7 @@ le DevKitC pour `air`, `presence` et `shutters`.
   volets, délai d'extinction de la lumière, correction de température.
 - Les automatismes critiques (hors-gel, lumière auto, arrêt des volets) tournent en local, sans HA ni WiFi.
 
-Les 8 nœuds compilent pour les 3 cartes (24 environnements) ;
+Les 9 nœuds compilent pour les 3 cartes (27 environnements) ;
 ils n'ont pas encore été testés sur du vrai matériel.
 
 ## Vérifications (aussi lancées par le CI à chaque push)

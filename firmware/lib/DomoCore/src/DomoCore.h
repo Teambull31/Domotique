@@ -39,7 +39,9 @@ public:
   // Mise en sécurité des actionneurs juste avant une mise à jour OTA ou un redémarrage décidé par
   // le socle (bouton HA, 15 min sans MQTT) : la boucle du nœud ne tourne plus ensuite.
   void onSafeState(std::function<void()> h) { _safe = h; }
-  bool publishTelemetry(JsonDocument& doc);
+  // retain=false pour un événement ponctuel (appui sur un bouton) : il ne doit pas être rejoué
+  // au redémarrage de Home Assistant.
+  bool publishTelemetry(JsonDocument& doc, bool retain = true);
   bool connected() { return _mqtt.connected(); }
   // Pour nœuds sur pile : attendre la connexion MQTT, puis laisser partir les paquets.
   bool waitConnected(uint32_t timeoutMs);

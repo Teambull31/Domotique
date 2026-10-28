@@ -19,6 +19,17 @@ views:
       - type: conditional
         conditions:
           - condition: state
+            entity: input_boolean.senior_appel_en_cours
+            state: "on"
+        card:
+          type: entities
+          title: "🆘 Appel à l'aide en cours"
+          entities:
+            - entity: input_boolean.senior_appel_en_cours
+              name: Éteindre une fois l'appel pris en compte
+      - type: conditional
+        conditions:
+          - condition: state
             entity: binary_sensor.fuite_d_eau_quelque_part
             state: "on"
         card:

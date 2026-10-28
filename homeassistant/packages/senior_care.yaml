@@ -25,6 +25,11 @@ input_boolean:
   senior_daily_report:
     name: Bilan quotidien du soir
     initial: true
+  # Allumé par le bouton d'appel, éteint par le proche quand il a pris l'appel en compte.
+  # Pas de valeur initiale : un appel en cours survit à un redémarrage de HA.
+  senior_appel_en_cours:
+    name: Appel en cours (éteindre une fois pris en compte)
+    icon: mdi:phone-alert
 
 # Bilan de la journée (remis à zéro à minuit)
 sensor:
@@ -57,15 +62,21 @@ group:
     entities:
       - binary_sensor.leak_cuisine_fuite
       - binary_sensor.leak_salle_de_bain_fuite
+  senior_boutons_appel:
+    name: "Tranquillité : boutons d'appel"
+    entities:
+      - binary_sensor.call_chambre_appel
   senior_capteurs_pile:
     name: "Tranquillité : capteurs sur pile"
     entities:
+      - binary_sensor.call_chambre_appel
       - binary_sensor.door_entree_ouverture
       - binary_sensor.leak_cuisine_fuite
       - binary_sensor.leak_salle_de_bain_fuite
   senior_piles:
     name: "Tranquillité : niveaux de pile"
     entities:
+      - sensor.call_chambre_batterie
       - sensor.door_entree_batterie
       - sensor.leak_cuisine_batterie
       - sensor.leak_salle_de_bain_batterie
@@ -189,6 +200,24 @@ template:
 # Fuite : alerte immédiate, rappels 5 min puis 15 min après, puis toutes les 30 min, tant que l'eau est là et que le proche n'a pas
 # acquitté (Paramètres > Entités > alert.fuite_d_eau > Acquitter, ou carte du tableau de bord).
 alert:
+  # Bouton d'appel : 1re notification par l'automatisation (avec le nom du bouton), puis rappel toutes
+  # les 5 min tant que « Appel en cours » n'est pas éteint. Toujours actif, même alertes coupées.
+  appel:
+    name: Appel à l'aide
+    entity_id: input_boolean.senior_appel_en_cours
+    state: "on"
+    repeat: 5
+    can_acknowledge: true
+    skip_first: true
+    title: "Appel à l'aide (rappel)"
+    message: >
+      Le bouton d'appel a été pressé à
+      {{ as_local(states.input_boolean.senior_appel_en_cours.last_changed).strftime('%H:%M') }}.
+      Pas encore pris en compte : appeler, puis éteindre « Appel en cours ».
+    done_message: "Appel pris en compte."
+    notifiers: [mobile_app_proche]
+    data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
+
   # Inactivité : alerte immédiate puis rappel toutes les heures tant que personne n'a acquitté
   # (un appel sans réponse, une notification balayée ne doivent pas clore le sujet).
   inactivite:
@@ -248,6 +277,25 @@ script:
           message: "2 notifications envoyées au proche à {{ now().strftime('%H:%M') }}. Vérifier avec lui qu'elles sont arrivées et que la 2e a sonné."
 
 automation:
+  # Toujours active, même alertes coupées : quelqu'un demande de l'aide.
+  - alias: "Senior - bouton d'appel"
+    trigger:
+      - platform: state
+        entity_id: group.senior_boutons_appel
+        to: "on"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.senior_appel_en_cours
+      - service: notify.mobile_app_proche
+        data:
+          title: "Appel à l'aide"
+          message: >
+            {{ expand('group.senior_boutons_appel') | selectattr('state', 'eq', 'on')
+               | map(attribute='name') | join(', ') or 'Bouton d\'appel' }} : appui à {{ now().strftime('%H:%M') }}.
+            Appeler, puis éteindre « Appel en cours » sur le tableau de bord.
+          data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
+
   # Toujours active, même alertes coupées : la nuit, une maison vide dont la porte s'ouvre = intrusion.
   - alias: "Senior - porte d'entrée ouverte la nuit"
     trigger:

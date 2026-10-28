@@ -259,14 +259,14 @@ void DomoCore::handleMessage(byte* payload, unsigned int len) {
   if (_handler) _handler(doc);
 }
 
-bool DomoCore::publishTelemetry(JsonDocument& doc) {
+bool DomoCore::publishTelemetry(JsonDocument& doc, bool retain) {
   if (!_mqtt.connected()) return false;
   doc["room"] = _room;
   String out;
   serializeJson(doc, out);
   // Retenue : après un redémarrage de HA ou du broker, l'état s'affiche tout de suite au lieu de
   // "inconnu" jusqu'au prochain envoi (la disponibilité reste gérée par le LWT / expire_after).
-  return _mqtt.publish(_tTelemetry.c_str(), out.c_str(), true);
+  return _mqtt.publish(_tTelemetry.c_str(), out.c_str(), retain);
 }
 
 void DomoCore::addEntity(const char* component, const char* key, const char* name,
