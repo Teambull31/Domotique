@@ -92,6 +92,7 @@ class TestMaisonEnAlerte(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.srv.shutdown()
+        cls.srv.server_close()
 
     def conf(self, token="jeton"):
         return {**CONF, "HA_URL": self.url, "HA_TOKEN": token}
@@ -111,6 +112,25 @@ class TestMaisonEnAlerte(unittest.TestCase):
 
     def test_non_configure(self):
         self.assertFalse(veille.maison_en_alerte(CONF))
+
+
+spec2 = importlib.util.spec_from_file_location("attendre", Path(__file__).with_name("attendre-ha.py"))
+attendre = importlib.util.module_from_spec(spec2)
+spec2.loader.exec_module(attendre)
+
+
+class TestAttendreHA(unittest.TestCase):
+    def test_ha_qui_repond_meme_401(self):
+        srv = http.server.HTTPServer(("127.0.0.1", 0), FauxHA)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            self.assertTrue(attendre.ha_repond(f"http://127.0.0.1:{srv.server_address[1]}/"))  # 401 sans jeton
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
+    def test_ha_injoignable(self):
+        self.assertFalse(attendre.ha_repond("http://127.0.0.1:9/", timeout=1))
 
 
 class TestES(unittest.TestCase):

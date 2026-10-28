@@ -49,6 +49,8 @@ UtmpIdentifier=tty1
 UtmpMode=user
 Environment=XDG_SESSION_TYPE=wayland
 ExecStartPre=/usr/local/bin/panneau-chromium-propre
+ExecStartPre=/usr/bin/python3 /usr/local/bin/panneau-attendre-ha $URL
+TimeoutStartSec=infinity
 ExecStart=/usr/bin/cage -d -- $BROWSER_BIN --kiosk --noerrdialogs --disable-infobars --no-first-run \\
   --password-store=basic --ozone-platform=wayland --check-for-update-interval=31536000 \\
   --disable-features=Translate --overscroll-history-navigation=0 --hide-crash-restore-bubble $URL
@@ -64,6 +66,7 @@ UNIT
 install -m 0755 "$(dirname "$0")/panneau-veille.py" /usr/local/bin/panneau-veille
 install -m 0755 "$(dirname "$0")/ecran.sh" /usr/local/bin/panneau-ecran   # réglage manuel ponctuel
 install -m 0755 "$(dirname "$0")/chromium-propre.sh" /usr/local/bin/panneau-chromium-propre
+install -m 0755 "$(dirname "$0")/attendre-ha.py" /usr/local/bin/panneau-attendre-ha
 if [[ ! -e /etc/default/panneau-veille ]]; then
   cat >/etc/default/panneau-veille <<'CONF'
 # Veille du panneau (luminosités en %, heures 0-23) ; puis : sudo systemctl restart panneau-veille
