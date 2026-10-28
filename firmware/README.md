@@ -11,7 +11,7 @@
 | `presence` | LD2410 + relais | présence (même immobile) + lumière auto locale ; forçage HA respecté tant que la pièce est occupée ; défaut radar signalé |
 | `shutters` | 2 relais | volet roulant interverrouillé, position 0-100 % estimée et mémorisée |
 | `gate` | relais contact sec + fin(s) de course | portail motorisé : état et commande par impulsion, jamais d'impulsion pendant un mouvement ([câblage](../docs/PANNEAU.md#4-portail-motorisé-nœud-gate)) |
-| `pilote` | 2 optotriacs (+ BME280 facultatif) | radiateurs électriques par fil pilote : Confort / Éco / Hors-gel / Arrêt, ou Auto (régulation par sonde) ; panne = Confort |
+| `pilote` | 2 optotriacs (+ BME280 facultatif) | radiateurs électriques par fil pilote : Confort / Éco / Hors-gel / Arrêt, ou Auto (régulation par sonde, fenêtre ouverte) ; panne = Confort ; Arrêt sous 7 °C = Hors-gel |
 | `heating` | BME280 + relais | entité thermostat HA, hors-gel, fenêtre ouverte, anti-cycles courts (3 min), coupure si capteur muet |
 
 Liste d'achat : [`docs/MATERIEL.md`](../docs/MATERIEL.md).

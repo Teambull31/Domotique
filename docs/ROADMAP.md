@@ -34,6 +34,9 @@ Tout est compilé et testé sur PC (logique) ; **rien n'est encore validé sur d
 ## Phase « contrôle » — panneau et tablettes
 - [x] `gate` : portail motorisé (état + commande par impulsion sécurisée)
 - [x] Tableau de bord « Maison » : panneau Raspberry Pi (kiosque) et tablette des proches
+- [x] Panneau : veille au toucher, rallumage sur alerte (appel, fuite, portail), attente de HA au démarrage,
+      pas de bandeau du navigateur après coupure ; guide d'utilisation à imprimer
+- [x] Portail : manœuvre non confirmée, variante télécommande sacrifiée, alerte d'ouverture la nuit
 - [x] État de la maison en une phrase, consommation du jour / du mois et coût estimé
 
 ## Phase 4 — Énergie
