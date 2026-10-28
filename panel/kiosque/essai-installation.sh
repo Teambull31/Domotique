@@ -70,8 +70,20 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 if ! grep -q "GET /rendu-ok" /tmp/http.log; then
-  ls -l /dev/dri >&2 2>/dev/null || echo "pas de /dev/dri" >&2
-  grep -E "Panneau|\[ERROR\]|FATAL|rror" /tmp/kiosque.log | head -20 >&2
+  {
+    set +e  # diagnostic : tout afficher, même si une commande échoue
+    echo "--- /dev/dri :"; ls -l /dev/dri 2>/dev/null || echo "absent"
+    echo "--- espaces de noms utilisateur (bac à sable de Chromium) :"
+    cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null || echo "pas de restriction AppArmor"
+    echo "--- processus :"  # pas de ps dans les images minimales
+    for p in /proc/[0-9]*; do tr '\0' ' ' <"$p/cmdline" 2>/dev/null; echo; done |
+      grep -E "^(cage|/usr/lib/chromium|Xwayland)" | cut -c1-150
+    echo "--- requêtes reçues :"; cat /tmp/http.log
+    echo "--- fin du journal du kiosque :"; tail -n 30 /tmp/kiosque.log | cut -c1-220
+    echo "--- Chromium seul, hors de Cage :"
+    su kiosk -s /bin/bash -c "HOME=/tmp timeout 30 $nav --headless=new --disable-gpu --dump-dom \
+      http://127.0.0.1:8123/tableau-maison/accueil/" 2>&1 | tail -n 5 | cut -c1-220
+  } >&2
   echec "le tableau de bord n'a pas été affiché par le kiosque"
 fi
 echo "OK : kiosque lancé, tableau de bord affiché (Cage + $(basename "$nav")) ; $(grep -h "^Panneau" /tmp/kiosque.log | tr '\n' ' ')"

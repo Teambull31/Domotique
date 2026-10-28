@@ -26,6 +26,9 @@ jobs:
             attendu: refus
     steps:
       - uses: actions/checkout@v4
+      # Runner Ubuntu 24.04 : AppArmor y restreint les espaces de noms utilisateur, nécessaires au bac
+      # à sable de Chromium. Propre à la machine de CI (pas à Raspberry Pi OS, Debian, Armbian).
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
       - run: >
           docker run --rm --privileged -v "$PWD/panel/kiosque:/src:ro" ${{ matrix.systeme }}
           bash /src/essai-installation.sh ${{ matrix.attendu }}
