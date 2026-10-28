@@ -14,6 +14,26 @@ inline bool thermostatWant(float temp, float target, float hysteresis, bool heat
   return heating;  // dans la bande : on garde l'état (pas d'oscillation)
 }
 
+// Relais de chauffage avec anti-cycles courts : pas de bascule à moins de `minCycleMs` de la
+// précédente (usure chaudière/relais), SAUF la coupure de sécurité quand la sonde est muette.
+class CycleGuard {
+public:
+  explicit CycleGuard(unsigned long minCycleMs) : min_(minCycleMs) {}
+  // Renvoie l'état du relais à appliquer maintenant.
+  bool apply(bool current, bool want, bool sensorDead, unsigned long now) {
+    if (want == current) return current;
+    bool safetyOff = sensorDead && !want;
+    if (switched_ && now - last_ < min_ && !safetyOff) return current;
+    last_ = now;
+    switched_ = true;
+    return want;
+  }
+
+private:
+  unsigned long min_, last_ = 0;
+  bool switched_ = false;
+};
+
 // Fenêtre ouverte : chute de `drop` °C entre la plus ancienne et la plus récente de `n`
 // mesures (une par minute). Après détection, l'historique repart de zéro.
 class WindowDetector {

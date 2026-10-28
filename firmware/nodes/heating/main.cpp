@@ -20,8 +20,8 @@ Adafruit_BME280 bme;
 Preferences prefs;
 bool bmeOk = false, enabled = true, heating = false, dirty = true;
 float setpoint = 19.0f, temp = NAN, offset = 0;  // offset : correction du capteur (°C)
-unsigned long lastSend = 0, lastValid = 0, windowSince = 0, lastSwitch = 0;
-bool switchedOnce = false;
+unsigned long lastSend = 0, lastValid = 0, windowSince = 0;
+domo::CycleGuard cycle(MIN_CYCLE_MS);  // anti-cycles courts (DomoLogic.h)
 bool windowOpen = false, sensorFault = false;
 domo::WindowDetector window(6, WINDOW_DROP_C);  // une mesure par minute sur 5 min
 
@@ -106,12 +106,9 @@ void loop() {
   // Sécurité : sans mesure valide (capteur muet) le relais est coupé
   float target = (enabled && !windowOpen) ? setpoint : FROST_C;
   bool want = domo::thermostatWant(temp, target, HYSTERESIS, heating);
-  // Anti-cycles courts (usure chaudière/relais), sauf coupure de sécurité capteur muet
-  bool cycleOk = !switchedOnce || millis() - lastSwitch >= MIN_CYCLE_MS || isnan(temp);
-  if (want != heating && cycleOk) {
-    heating = want;
-    lastSwitch = millis();
-    switchedOnce = true;
+  bool next = cycle.apply(heating, want, isnan(temp), millis());
+  if (next != heating) {
+    heating = next;
     digitalWrite(RELAY_PIN, heating ? HIGH : LOW);
     dirty = true;
   }

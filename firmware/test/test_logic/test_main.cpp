@@ -6,6 +6,7 @@
 #include <initializer_list>
 
 using domo::thermostatWant;
+using domo::CycleGuard;
 using domo::PresenceLight;
 using domo::WindowDetector;
 using domo::batteryPercent;
@@ -155,6 +156,31 @@ void test_mode_auto_desactive() {
   TEST_ASSERT_FALSE(p.light());
 }
 
+// --- Anti-cycles courts du chauffage ---
+static const unsigned long CYCLE = 3UL * 60 * 1000;
+
+void test_cycle_premiere_bascule_immediate() {
+  CycleGuard g(CYCLE);
+  TEST_ASSERT_TRUE(g.apply(false, true, false, 1000));
+}
+void test_cycle_bascule_bloquee_moins_de_3_min() {
+  CycleGuard g(CYCLE);
+  g.apply(false, true, false, 1000);                         // allumé
+  TEST_ASSERT_TRUE(g.apply(true, false, false, 1000 + 60000));  // extinction refusée à 1 min
+  TEST_ASSERT_FALSE(g.apply(true, false, false, 1000 + CYCLE));  // acceptée à 3 min
+}
+void test_cycle_sonde_muette_coupe_immediatement() {
+  CycleGuard g(CYCLE);
+  g.apply(false, true, false, 1000);
+  TEST_ASSERT_FALSE(g.apply(true, false, true, 1000 + 5000));  // sécurité : pas d'attente
+}
+void test_cycle_etat_inchange_ne_consomme_pas_le_delai() {
+  CycleGuard g(CYCLE);
+  g.apply(false, true, false, 1000);
+  g.apply(true, true, false, 200000);  // pas de bascule
+  TEST_ASSERT_FALSE(g.apply(true, false, false, 1000 + CYCLE));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -182,5 +208,9 @@ int main() {
   RUN_TEST(test_forcage_respecte_tant_que_occupe);
   RUN_TEST(test_auto_reprend_quand_piece_vide);
   RUN_TEST(test_mode_auto_desactive);
+  RUN_TEST(test_cycle_premiere_bascule_immediate);
+  RUN_TEST(test_cycle_bascule_bloquee_moins_de_3_min);
+  RUN_TEST(test_cycle_sonde_muette_coupe_immediatement);
+  RUN_TEST(test_cycle_etat_inchange_ne_consomme_pas_le_delai);
   return UNITY_END();
 }
