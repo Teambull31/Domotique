@@ -13,7 +13,9 @@ script:
       message: { description: Texte }
       urgent: { description: "true = sonne même en silencieux (Android : alarm_stream, iOS : critique)" }
     sequence:
-      - service: notify.notify  # ← remplacer par notify.mobile_app_<téléphone> (vous, ou le proche aidant)
+      # ← remplacer par notify.mobile_app_<téléphone>, ou notify.proche_aidant si le package
+      #   senior_care est installé (mêmes destinataires que les alertes tranquillité)
+      - service: notify.notify
         data:
           title: "{{ titre }}"
           message: "{{ message }}"

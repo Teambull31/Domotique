@@ -12,8 +12,9 @@
 - [ ] HA installé (HA Green ou Raspberry Pi), à jour, sauvegardes automatiques activées.
 - [ ] Module complémentaire **Mosquitto broker** + utilisateur HA dédié `domo` (mot de passe fort) ;
       intégration **MQTT** activée.
-- [ ] App **Home Assistant** installée sur le téléphone du proche aidant ; renommer son service de
-      notification en `mobile_app_proche` (ou adapter le package).
+- [ ] App **Home Assistant** installée sur le téléphone de chaque proche aidant ; inscrire leurs
+      services `notify.mobile_app_…` dans le groupe `proche_aidant` en tête de `senior_care.yaml`
+      (tous les proches listés reçoivent toutes les alertes), puis lancer **Tester les alertes du proche**.
 - [ ] Accès à distance (Nabu Casa ou Tailscale) pour le dépannage, avec l'accord écrit du client.
 
 ## 3. Mise en service de chaque nœud

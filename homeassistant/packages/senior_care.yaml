@@ -3,10 +3,21 @@
 # ADAPTER À CHAQUE SITE (voir Paramètres > Appareils) :
 #   1. les groupes ci-dessous : une seule liste par type de capteur, utilisée par toutes les alertes ;
 #   2. les quelques entités uniques : porte d'entrée, CO2 de la chambre, puissance de la cuisson ;
-#   3. notify.mobile_app_proche (téléphone du proche aidant).
+#   3. les téléphones prévenus : groupe notify « proche_aidant » ci-dessous (plusieurs proches possibles).
 # Principe : aucune action demandée à la personne âgée ; seul le proche aidant est notifié.
 # Alertes urgentes (fuite, inactivité, porte la nuit) : sonnent même en mode silencieux
 # (Android : canal alarm_stream ; iOS : alerte critique, à autoriser dans l'app Companion).
+
+# Proches prévenus : SEUL endroit où choisir les téléphones. Toutes les alertes de ce package passent
+# par notify.proche_aidant ; chaque téléphone listé les reçoit toutes (un téléphone éteint ou retiré
+# n'empêche pas les autres de recevoir). Nom du service : Paramètres > Applications mobiles, ou
+# Outils de développement > Actions, « notify.mobile_app_… ».
+notify:
+  - platform: group
+    name: proche_aidant
+    services:
+      - action: mobile_app_proche              # ← téléphone du proche aidant
+      # - action: mobile_app_telephone_de_papa # ← un 2e proche : décommenter et adapter
 
 input_number:
   senior_inactivity_hours:
@@ -216,7 +227,7 @@ alert:
       {{ as_local(states.input_boolean.senior_appel_en_cours.last_changed).strftime('%H:%M') }}.
       Pas encore pris en compte : appeler, puis éteindre « Appel en cours ».
     done_message: "Appel pris en compte."
-    notifiers: [mobile_app_proche]
+    notifiers: [proche_aidant]
     data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
 
   # Inactivité : alerte immédiate puis rappel toutes les heures tant que personne n'a acquitté
@@ -237,7 +248,7 @@ alert:
     done_message: >
       {{ 'Activité de nouveau détectée à la maison.' if is_state('binary_sensor.activite_recente_a_la_maison', 'on')
          else 'Fin de la surveillance de jour (21 h ou alertes coupées) : toujours aucune activité détectée.' }}
-    notifiers: [mobile_app_proche]
+    notifiers: [proche_aidant]
     data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
 
   fuite_d_eau:
@@ -252,7 +263,7 @@ alert:
       De l'eau est détectée :
       {{ expand('group.senior_fuites') | selectattr('state', 'eq', 'on') | map(attribute='name') | join(', ') }}.
     done_message: "Fuite d'eau : plus d'eau détectée par les sondes."
-    notifiers: [mobile_app_proche]
+    notifiers: [proche_aidant]
     data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
 
 # À lancer à l'installation et après chaque changement de téléphone du proche : vérifie que les
@@ -262,12 +273,12 @@ script:
     alias: "Tester les alertes du proche"
     icon: mdi:bell-check
     sequence:
-      - service: notify.mobile_app_proche
+      - service: notify.proche_aidant
         data:
           title: "Test 1/2 : notification normale"
           message: "Si vous lisez ceci, les alertes de la maison arrivent bien."
       - delay: "00:00:10"
-      - service: notify.mobile_app_proche
+      - service: notify.proche_aidant
         data:
           title: "Test 2/2 : alerte urgente"
           message: "Ce test doit sonner même téléphone en silencieux. Sinon, autoriser les alertes critiques (iOS) ou le canal alarm_stream (Android) dans l'app Home Assistant."
@@ -288,7 +299,7 @@ automation:
       - service: input_boolean.turn_on
         target:
           entity_id: input_boolean.senior_appel_en_cours
-      - service: notify.mobile_app_proche
+      - service: notify.proche_aidant
         data:
           title: "Appel à l'aide"
           message: >
@@ -311,7 +322,7 @@ automation:
         after: "22:30:00"
         before: "06:00:00"
     action:
-      - service: notify.mobile_app_proche
+      - service: notify.proche_aidant
         data: { title: "Porte d'entrée ouverte", message: "La porte d'entrée vient de s'ouvrir en pleine nuit.", data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } } }
 
   - alias: "Senior - CO2 élevé, aérer"
@@ -325,7 +336,7 @@ automation:
         entity_id: input_boolean.senior_alerts_enabled
         state: "on"
     action:
-      - service: notify.mobile_app_proche
+      - service: notify.proche_aidant
         data: { title: "Air confiné", message: "CO2 élevé dans la chambre (> 1500 ppm)." }
 
   - alias: "Senior - capteur muet, en défaut ou batterie faible"
@@ -340,7 +351,7 @@ automation:
              and trigger.from_state.state not in ['unknown', 'unavailable']
              and trigger.to_state.state | int(0) > trigger.from_state.state | int(0) }}
     action:
-      - service: notify.mobile_app_proche
+      - service: notify.proche_aidant
         data:
           title: "Capteur à vérifier"
           message: >
@@ -359,7 +370,7 @@ automation:
         entity_id: input_boolean.senior_alerts_enabled
         state: "on"
     action:
-      - service: notify.mobile_app_proche
+      - service: notify.proche_aidant
         data:
           title: "Cuisson allumée depuis 1 h 30"
           message: "La plaque ou le four consomme encore {{ states('sensor.power_cuisson_puissance') }} W. Oubli possible."
@@ -385,7 +396,7 @@ automation:
         entity_id: input_boolean.senior_alerts_enabled
         state: "on"
     action:
-      - service: notify.mobile_app_proche
+      - service: notify.proche_aidant
         data:
           title: "{{ 'Chaleur' if trigger.id == 'chaud' else 'Froid' }} dans le logement"
           message: >
@@ -409,7 +420,7 @@ automation:
         entity_id: input_boolean.senior_alerts_enabled
         state: "on"
     action:
-      - service: notify.mobile_app_proche
+      - service: notify.proche_aidant
         data:
           title: "Porte d'entrée ouverte depuis 15 min"
           message: "Oubli, ou départ sans refermer ? Un appel peut lever le doute."
@@ -425,7 +436,7 @@ automation:
         entity_id: input_boolean.senior_daily_report
         state: "on"
     action:
-      - service: notify.mobile_app_proche
+      - service: notify.proche_aidant
         data:
           title: "Bilan de la journée"
           message: >
