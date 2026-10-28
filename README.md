@@ -6,7 +6,7 @@
 | [`firmware/`](firmware/README.md) | Nœuds ESP32 en C++ (PlatformIO) : climat, air, énergie, porte, fuite, bouton d'appel, présence, volets, chauffage, portail — cartes DevKitC, C3, S3 |
 | [`homeassistant/`](homeassistant/) | Alertes « tranquillité » pour proches âgés, consommation et état de la maison, tableaux de bord, tests |
 | [`docs/`](docs/) | [Feuille de route](docs/ROADMAP.md), [déploiement chez un proche/client](docs/DEPLOIEMENT.md), [fiche d'installation](docs/INSTALLATION.md), [matériel](docs/MATERIEL.md), [panneau et tablette](docs/PANNEAU.md), [guide d'utilisation à imprimer](docs/GUIDE_UTILISATEUR.md) |
-| [`panel/`](docs/PANNEAU.md) | Panneau mural (Raspberry Pi + écran tactile) et tablette des proches : tableau de bord « Maison » |
+| [`panel/`](docs/PANNEAU.md) | Panneau mural (Raspberry Pi, Orange Pi ou autre carte ARM + écran tactile) et tablette des proches : tableau de bord « Maison » |
 | `backend/`, `frontend/`, `mosquitto/` | Tableau de bord web autonome (sans Home Assistant), décrit ci-dessous |
 
 ---

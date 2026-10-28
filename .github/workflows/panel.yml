@@ -9,5 +9,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: shellcheck panel/raspberry/*.sh homeassistant/check_config.sh
-      - run: python3 panel/raspberry/test_panneau_veille.py
+      - run: shellcheck panel/kiosque/*.sh homeassistant/check_config.sh
+      - run: python3 panel/kiosque/test_panneau_veille.py

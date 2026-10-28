@@ -19,8 +19,9 @@ Carte conseillée selon tes cartes disponibles (DevKitC = ESP32 classique, C3, S
 | `heating` | DevKitC ou S3 | BME280 + relais **contact sec** vers l'entrée thermostat de la chaudière / du fil pilote | 5–10 € |
 
 ## Panneau mural (voir PANNEAU.md)
-Raspberry Pi 4 ou 5 (2 Go), alimentation officielle, microSD 16 Go, écran tactile 6-7 pouces (DSI de
-préférence : luminosité pilotable), support mural ou cadre. Tablette des proches : n'importe quelle tablette
+Raspberry Pi 4 ou 5 (2 Go), ou à défaut Orange Pi / autre carte ARM 2 Go sous Armbian (Debian) :
+interchangeables, même installation. Alimentation officielle de la carte, microSD 16 Go, écran tactile
+6-7 pouces (DSI / à nappe de préférence : luminosité pilotable), support mural ou cadre. Tablette des proches : n'importe quelle tablette
 récente avec l'application Home Assistant.
 
 ## Commun à tous les nœuds secteur

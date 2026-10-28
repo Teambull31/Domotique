@@ -4,7 +4,8 @@
 Le premier contact sur un écran tamisé ne fait que le réveiller : il n'est PAS transmis au tableau de
 bord (périphériques d'entrée « saisis » pendant la veille), donc pas de lumière allumée ou de portail
 ouvert par erreur en réveillant l'écran. Niveaux plus bas la nuit.
-Écrans à rétroéclairage pilotable (/sys/class/backlight : DSI, dont l'écran officiel Raspberry Pi).
+Écrans à rétroéclairage pilotable (/sys/class/backlight : DSI, dont l'écran officiel Raspberry Pi, et
+la plupart des écrans à nappe des cartes ARM, Orange Pi compris), quelle que soit la carte.
 Alerte (facultatif, HA_URL + HA_TOKEN) : tant que l'« État de la maison » n'est pas « Tout va bien »
 (fuite, portail ouvert, appel…), l'écran reste à pleine luminosité pour que le problème se voie.
 Réglages : /etc/default/panneau-veille (voir install-kiosk.sh). Lancé par le service panneau-veille.
@@ -121,20 +122,50 @@ class Surveillance(threading.Thread):
             time.sleep(self.periode)
 
 
+def valeur_retro(pct, maxi):
+    """Valeur à écrire pour pct % : jamais 0 si pct > 0. Certains écrans n'ont que quelques niveaux
+    (max_brightness 7 ou 31) : 3 % arrondi à 0 éteindrait complètement l'écran."""
+    v = maxi * pct // 100
+    return max(1, v) if pct > 0 and maxi > 0 else v
+
+
 def appliquer_luminosite(pct, motif="/sys/class/backlight/*"):
     for bl in glob.glob(motif):
         try:
             with open(os.path.join(bl, "max_brightness")) as f:
                 maxi = int(f.read())
             with open(os.path.join(bl, "brightness"), "w") as f:
-                f.write(str(maxi * pct // 100))
-        except OSError:
+                f.write(str(valeur_retro(pct, maxi)))
+        except (OSError, ValueError):
             pass
+
+
+POINTEURS = ("ID_INPUT_TOUCHSCREEN", "ID_INPUT_TABLET", "ID_INPUT_MOUSE", "ID_INPUT_TOUCHPAD")
+
+
+def est_pointeur(evenement, sysfs="/sys/class/input", udev="/run/udev/data"):
+    """Écran tactile (ou souris) d'après udev ; None si udev ne sait pas. Les autres entrées ne sont
+    ni surveillées ni bloquées : bouton d'alimentation (Raspberry Pi 5, cartes ARM : le bloquer
+    empêcherait l'arrêt pendant la veille), récepteur infrarouge, télécommande HDMI-CEC."""
+    try:
+        with open(os.path.join(sysfs, evenement, "dev")) as f:
+            majmin = f.read().strip()
+        with open(os.path.join(udev, "c" + majmin)) as f:
+            proprietes = f.read().split()
+    except OSError:
+        return None
+    return any(f"E:{p}=1" in proprietes for p in POINTEURS)
+
+
+def entrees_a_surveiller(motif="/dev/input/event*", sysfs="/sys/class/input", udev="/run/udev/data"):
+    chemins = sorted(glob.glob(motif))
+    choisis = [c for c in chemins if est_pointeur(os.path.basename(c), sysfs, udev)]
+    return choisis or chemins  # écran non reconnu par udev : toutes les entrées, comme avant
 
 
 def ouvrir_entrees(motif="/dev/input/event*"):
     fds = []
-    for chemin in glob.glob(motif):
+    for chemin in entrees_a_surveiller(motif):
         try:
             fds.append(os.open(chemin, os.O_RDONLY | os.O_NONBLOCK))
         except OSError:

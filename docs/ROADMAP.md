@@ -38,7 +38,8 @@ Tout est compilé et testé sur PC (logique) ; **rien n'est encore validé sur d
 
 ## Phase « contrôle » — panneau et tablettes
 - [x] `gate` : portail motorisé (état + commande par impulsion sécurisée)
-- [x] Tableau de bord « Maison » : panneau Raspberry Pi (kiosque) et tablette des proches
+- [x] Tableau de bord « Maison » : panneau mural (kiosque) sur Raspberry Pi 3B+/4/5, Orange Pi et autres cartes
+      ARM (Armbian Debian), interchangeables ; tablette des proches
 - [x] Panneau : veille au toucher, rallumage sur alerte (appel, fuite, portail), attente de HA au démarrage,
       pas de bandeau du navigateur après coupure, relance nocturne du navigateur, chien de garde du Pi ;
       guide d'utilisation à imprimer

@@ -1,7 +1,8 @@
-# Panneau de contrôle (Raspberry Pi + écran) et tablette des proches
+# Panneau de contrôle (Raspberry Pi ou Orange Pi + écran) et tablette des proches
 
 Un même tableau de bord Home Assistant, **Maison** (`homeassistant/dashboards/maison.yaml`), sert :
-- au **panneau mural** : Raspberry Pi + écran tactile ~6-7 pouces, allumé en permanence ;
+- au **panneau mural** : Raspberry Pi (ou Orange Pi, autre carte ARM) + écran tactile ~6-7 pouces, allumé en
+  permanence ;
 - à la **tablette des grands-parents**, qui pilote les équipements de **leur** maison (chaque site a son
   propre Home Assistant, voir [DEPLOIEMENT.md](DEPLOIEMENT.md)).
 
@@ -25,44 +26,72 @@ Deux pages, grandes tuiles au doigt :
 4. Créer un utilisateur **panneau** (Paramètres > Personnes), **non administrateur** : depuis l'écran, on
    pilote la maison mais on ne modifie pas la configuration.
 
-## 2. Panneau mural (Raspberry Pi)
-**Matériel** : Raspberry Pi 4 ou 5 (2 Go suffisent), alimentation officielle, carte microSD 16 Go,
-écran tactile 6-7 pouces. Préférer un écran **DSI** (connecteur plat, ex. écran officiel Raspberry Pi) :
-sa luminosité est pilotable, donc l'écran se tamise quand on ne s'en sert pas. Un écran HDMI + USB tactile
-fonctionne aussi, mais reste à pleine luminosité (réglage sur l'écran lui-même).
+## 2. Panneau mural (Raspberry Pi, Orange Pi ou autre carte ARM)
+Le même script installe le panneau sur toutes ces cartes : en cas de panne, une carte se remplace par une
+autre (voir **Changer de carte** plus bas).
 
-1. Avec Raspberry Pi Imager : **Raspberry Pi OS Lite (64 bits)**, en renseignant WiFi, nom d'utilisateur
-   et SSH dans les réglages avancés.
-2. Copier le dossier `panel/raspberry/` sur le Pi, puis :
+| Carte | Système à installer | Remarques |
+|---|---|---|
+| Raspberry Pi 4 ou 5 (2 Go ou plus) | Raspberry Pi OS **Lite** 64 bits | conseillé : accélération graphique, écrans DSI officiels |
+| Raspberry Pi 3B+ | Raspberry Pi OS Lite 64 bits | fonctionne, lent (1 Go) |
+| Orange Pi (5, 3B, Zero 3…) et autres cartes ARM | **Armbian**, variante **Debian** (Bookworm ou plus récent), image minimale | écran HDMI + USB tactile le plus simple ; écran à nappe selon la carte (overlay Armbian) |
+| Toute carte sous **Ubuntu** (images Orange Pi officielles comprises) | non pris en charge | Chromium n'y existe qu'en snap : le script refuse et l'explique |
+
+Le script détecte la carte et le système, installe le bon navigateur (`chromium-browser` sur Raspberry Pi
+OS Bookworm, `chromium` ailleurs), ignore ce qui manque sur les images minimales, et désactive le bureau
+graphique d'une image « avec bureau » (il prendrait l'écran). Image sans pilote graphique 3D (fréquent sur
+les cartes ARM hors Raspberry Pi) : **rendu logiciel** choisi automatiquement, sinon écran noir.
+
+**Écran** : tactile 6-7 pouces. Préférer un écran **DSI** / à nappe (ex. écran officiel Raspberry Pi) : sa
+luminosité est pilotable, donc l'écran se tamise quand on ne s'en sert pas (quelle que soit la carte, s'il
+apparaît dans `/sys/class/backlight`). Un écran HDMI + USB tactile fonctionne partout, mais reste à pleine
+luminosité (réglage sur l'écran lui-même). Alimentation officielle de la carte, microSD 16 Go.
+
+1. Installer le système du tableau ci-dessus (Raspberry Pi Imager pour un Raspberry Pi, en renseignant
+   WiFi, nom d'utilisateur et SSH ; image Armbian pour une autre carte), puis régler le fuseau horaire
+   (`sudo timedatectl set-timezone Europe/Paris`) : les heures de nuit de la veille en dépendent.
+2. Copier le dossier `panel/kiosque/` sur la carte, puis :
    ```
    sudo ./install-kiosk.sh http://<ip-de-home-assistant>:8123/tableau-maison/accueil
    sudo reboot
    ```
    Au démarrage, le tableau de bord s'affiche en plein écran (Cage + Chromium, sans bureau).
    **Sans entretien** : le navigateur est relancé chaque nuit à 4 h (mémoire, nouvelle version de HA),
-   et le chien de garde matériel redémarre le Pi s'il se fige.
-   **Veille** (écrans DSI) : après 1 min sans contact, l'écran se tamise (15 % le jour, 3 % la nuit :
-   l'état de la maison reste lisible de loin) ; il revient au toucher, et ce premier contact **ne
-   déclenche rien** (pas de lumière allumée ni de portail ouvert en réveillant l'écran). Délai et niveaux
+   et le chien de garde matériel redémarre la carte si elle se fige.
+   **Veille** (écrans à luminosité pilotable) : après 1 min sans contact, l'écran se tamise (15 % le jour,
+   3 % la nuit : l'état de la maison reste lisible de loin, jamais complètement éteint même sur un écran à
+   peu de niveaux) ; il revient au toucher, et ce premier contact **ne déclenche rien** (pas de lumière
+   allumée ni de portail ouvert en réveillant l'écran). Seuls l'écran tactile et une éventuelle souris sont
+   concernés : le bouton d'alimentation (Raspberry Pi 5, cartes ARM) reste utilisable. Délai et niveaux
    dans `/etc/default/panneau-veille`, puis `sudo systemctl restart panneau-veille`.
    **Réveil sur alerte** (conseillé) : renseigner `HA_URL` et `HA_TOKEN` (jeton longue durée de
    l'utilisateur *panneau*) dans ce même fichier : tant que l'état de la maison n'est pas « Tout va
    bien » (fuite, portail ouvert, appel…), l'écran reste allumé et le problème se voit de loin.
+   **Écran noir** malgré tout (pilote graphique défaillant) : `RENDU=logiciel` dans `/etc/default/panneau`,
+   puis `sudo systemctl restart panneau`.
 3. **Connexion automatique** du panneau à HA (pas de clavier à l'écran) : dans `configuration.yaml`,
-   autoriser **la seule adresse IP du Pi** (réservée dans la box) à se connecter en tant que *panneau* :
+   autoriser **la seule adresse IP du panneau** (réservée dans la box) à se connecter en tant que *panneau* :
    ```yaml
    homeassistant:
      auth_providers:
        - type: trusted_networks
          trusted_networks:
-           - 192.168.1.50/32        # IP fixe du Raspberry Pi
+           - 192.168.1.50/32        # IP fixe du panneau (réservée dans la box)
          trusted_users:
            192.168.1.50/32: <id de l'utilisateur panneau>   # Paramètres > Personnes > Utilisateurs
          allow_bypass_login: true
        - type: homeassistant          # garder la connexion normale pour tous les autres
    ```
-4. Écran à l'envers ou en portrait : l'orientation se règle dans `/boot/firmware/cmdline.txt` selon
-   l'écran (voir sa documentation, ex. `video=DSI-1:panel_orientation=upside_down`).
+4. Écran à l'envers ou en portrait : l'orientation se règle sur la ligne de commande du noyau selon
+   l'écran (voir sa documentation, ex. `video=DSI-1:panel_orientation=upside_down`) : dans
+   `/boot/firmware/cmdline.txt` sur Raspberry Pi, dans `extraargs=` de `/boot/armbianEnv.txt` sous Armbian.
+
+**Changer de carte** (panne, ou passage d'un Raspberry Pi à un Orange Pi) : tous les réglages du panneau
+tiennent dans deux fichiers. Les garder de côté (`sudo tar czf panneau.tgz /etc/default/panneau
+/etc/default/panneau-veille`), installer le système sur la nouvelle carte, remettre ces deux fichiers dans
+`/etc/default/`, puis lancer `sudo ./install-kiosk.sh` **sans adresse** (reprise de l'ancienne) et
+redémarrer. Dans la box, reporter la réservation d'adresse IP sur la nouvelle carte (elle a une autre
+adresse matérielle) : sinon la connexion automatique à HA ne la reconnaît pas.
 
 Même installation chez chaque proche (ex. le salon d'un parent) : un panneau par site, relié au Home
 Assistant de **ce** site.

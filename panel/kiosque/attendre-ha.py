@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Attend que Home Assistant réponde avant de lancer le navigateur du panneau.
 
-Après une coupure de courant, le Raspberry Pi démarre bien avant Home Assistant : Chromium resterait
+Après une coupure de courant, le panneau démarre bien avant Home Assistant : Chromium resterait
 sur une page d'erreur. Usage : attendre-ha.py <url> [délai max en s, 600 par défaut]. Rend toujours la
 main (code 0) au bout du délai : mieux vaut une page d'erreur qu'un écran noir.
 """
