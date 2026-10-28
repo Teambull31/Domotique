@@ -60,6 +60,8 @@
 - [ ] Le premier soir : le **bilan de la journée** arrive à 20 h sur le téléphone du proche.
 
 ## 7. Remise au client
+- [ ] Imprimer et remplir le [guide d'utilisation](GUIDE_UTILISATEUR.md) (nom et numéro à appeler),
+      le laisser près de l'écran et le parcourir ensemble.
 - [ ] Personne âgée : rien à faire, rien à toucher ; expliquer simplement ce qui est surveillé (et ce
       qui ne l'est pas : ce n'est **ni une téléassistance ni un détecteur de chute**).
 - [ ] Proche aidant : les alertes fuite et inactivité **se répètent jusqu'à acquittement** (tableau de bord
