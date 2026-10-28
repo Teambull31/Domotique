@@ -241,6 +241,14 @@ async def main() -> int:
     c.check("appareils : tous en ligne", appareils_s["state"], "2 en ligne")
     sources.clear()
 
+    nuit = next(a for a in MAISON["automation"] if a["alias"] == "Maison - portail ouvert la nuit")
+    maison({"cover.gate_entree_portail": ("closed", {"device_class": "gate"}),
+            "cover.shutters_salon_volet": ("open", {"device_class": "shutter"})})
+    c.check("portail la nuit : fermé (et volet ouvert) -> rien", nuit["trigger"][0]["value_template"], False)
+    maison({"cover.gate_entree_portail": ("opening", {"device_class": "gate"})})
+    c.check("portail la nuit : en ouverture -> alerte", nuit["trigger"][0]["value_template"], True)
+    c.check("portail la nuit : le message nomme le portail", nuit["action"][0]["data"]["message"], "gate_entree_portail")
+
     etat = maison_sensors["maison_etat"]
     maison({"binary_sensor.leak_cuisine_fuite": ("off", {"device_class": "moisture"}),
             "cover.gate_entree_portail": ("closed", {"device_class": "gate"}),

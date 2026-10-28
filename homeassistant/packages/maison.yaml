@@ -96,6 +96,28 @@ automation:
                | selectattr('attributes.device_class', 'eq', 'gate') | selectattr('state', 'eq', 'open')
                | map(attribute='name') | join(', ') }} : penser à le refermer (bouton sur le panneau).
 
+  # Portail qui s'ouvre la nuit : intrusion, ou sortie nocturne inhabituelle d'une personne âgée.
+  - alias: "Maison - portail ouvert la nuit"
+    trigger:
+      - platform: template
+        value_template: >
+          {{ states.cover | selectattr('attributes.device_class', 'defined')
+             | selectattr('attributes.device_class', 'eq', 'gate')
+             | selectattr('state', 'in', ['open', 'opening']) | list | count > 0 }}
+    condition:
+      - condition: time
+        after: "22:30:00"
+        before: "06:00:00"
+    action:
+      - service: notify.notify  # remplacer par notify.mobile_app_xxx (proche aidant)
+        data:
+          title: "Portail ouvert en pleine nuit"
+          message: >
+            {{ states.cover | selectattr('attributes.device_class', 'defined')
+               | selectattr('attributes.device_class', 'eq', 'gate') | selectattr('state', 'in', ['open', 'opening'])
+               | map(attribute='name') | join(', ') }} s'est ouvert à {{ now().strftime('%H:%M') }}.
+          data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
+
   # Variante « télécommande sacrifiée » (portail non câblable, voir docs/PANNEAU.md) : la position du
   # portail vient d'un nœud « door » sur pile posé au portail (pièce « portail »). HA la transmet au nœud
   # gate (retenue : reçue aussi après un redémarrage du nœud). Activer « Position fournie par HA » sur
