@@ -131,6 +131,12 @@ de position**. Les sécurités (cellules photo-électriques, détection d'obstac
   n'envoie aucun ordre à l'aveugle (« fermer » un portail déjà fermé l'ouvrirait).
   Copier le signal d'une télécommande n'est possible qu'avec un **code fixe** (anciennes 433 MHz) ;
   Somfy RTS peut être appairé comme une nouvelle télécommande (ESP32 + CC1101, projet ESPSomfy-RTS).
+  **Pile de la télécommande sacrifiée** : quand elle s'use, le portail ne répond plus (signalé par
+  « Manœuvre non confirmée »). Le plus sûr : alimenter la télécommande par le nœud à la place de sa
+  pile : pile 3 V (CR2032, CR2016) -> sortie 3V3 de l'ESP32 ; pile 12 V (A23, 23A) -> petit convertisseur
+  élévateur 5 V -> 12 V réglé sur 12 V. Respecter la polarité, garder le boîtier de la télécommande près
+  du nœud (la portée radio vers le portail se vérifie à l'installation). À défaut : changer la pile
+  tous les ans, date notée sur la télécommande.
 - **Manœuvre non confirmée** : si le portail n'atteint pas la position attendue 30 s après la durée de
   manœuvre (ordre radio perdu, obstacle, panne), le nœud le signale ; c'est repris par « État de la
   maison » et l'alerte « Capteur à vérifier ».
