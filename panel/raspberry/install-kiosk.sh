@@ -98,9 +98,39 @@ WantedBy=multi-user.target
 UNIT
 rm -f /etc/cron.d/panneau-ecran  # ancienne version : tamisage à heure fixe
 
+# Relance du navigateur chaque nuit : après des semaines, Chromium grossit en mémoire, et après une
+# mise à jour de Home Assistant le tableau de bord demande à être rechargé (personne pour le faire).
+cat >/etc/systemd/system/panneau-relance.service <<'UNIT'
+[Unit]
+Description=Relance quotidienne du navigateur du panneau
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl try-restart panneau.service
+UNIT
+cat >/etc/systemd/system/panneau-relance.timer <<'UNIT'
+[Unit]
+Description=Relance du navigateur du panneau chaque nuit à 4 h
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+# Chien de garde matériel : Raspberry Pi figé (noyau bloqué, mémoire saturée) -> redémarrage
+# automatique, au lieu d'un écran gelé jusqu'à la prochaine visite. 15 s = maximum du Pi.
+mkdir -p /etc/systemd/system.conf.d
+cat >/etc/systemd/system.conf.d/panneau-chien-de-garde.conf <<'CONF'
+[Manager]
+RuntimeWatchdogSec=15
+RebootWatchdogSec=2min
+CONF
+
 systemctl disable getty@tty1.service || true
 systemctl set-default graphical.target
 systemctl daemon-reload
-systemctl enable panneau.service panneau-veille.service
+systemctl enable panneau.service panneau-veille.service panneau-relance.timer
 
 echo "Panneau installé. Redémarrer : sudo reboot"

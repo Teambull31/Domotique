@@ -39,6 +39,8 @@ fonctionne aussi, mais reste à pleine luminosité (réglage sur l'écran lui-m�
    sudo reboot
    ```
    Au démarrage, le tableau de bord s'affiche en plein écran (Cage + Chromium, sans bureau).
+   **Sans entretien** : le navigateur est relancé chaque nuit à 4 h (mémoire, nouvelle version de HA),
+   et le chien de garde matériel redémarre le Pi s'il se fige.
    **Veille** (écrans DSI) : après 1 min sans contact, l'écran se tamise (15 % le jour, 3 % la nuit :
    l'état de la maison reste lisible de loin) ; il revient au toucher, et ce premier contact **ne
    déclenche rien** (pas de lumière allumée ni de portail ouvert en réveillant l'écran). Délai et niveaux
