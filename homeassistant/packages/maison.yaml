@@ -66,6 +66,19 @@ template:
             {% from 'maison.jinja' import points_a_verifier %}
             {{ points_a_verifier() | from_json }}
 
+      # État des appareils connectés : « 12 en ligne » ou « 11 en ligne, 1 hors ligne » + la liste
+      - name: "Appareils connectés"
+        unique_id: maison_appareils
+        icon: mdi:devices
+        state: >
+          {% from 'maison.jinja' import appareils %}
+          {% set a = appareils() | from_json %}
+          {{ a.en_ligne }} en ligne{{ (', ' ~ (a.hors_ligne | count) ~ ' hors ligne') if a.hors_ligne else '' }}
+        attributes:
+          hors_ligne: >
+            {% from 'maison.jinja' import appareils %}
+            {{ (appareils() | from_json).hors_ligne }}
+
 automation:
   - alias: "Maison - portail resté ouvert"
     trigger:

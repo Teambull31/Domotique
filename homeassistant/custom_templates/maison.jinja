@@ -19,9 +19,27 @@
 {%- for e in bs | selectattr('attributes.device_class', 'eq', 'problem') | selectattr('state', 'eq', 'on') -%}
   {%- set ns.l = ns.l + ['En panne : ' ~ e.name] -%}
 {%- endfor -%}
+{%- for nom in (appareils() | from_json).hors_ligne -%}
+  {%- set ns.l = ns.l + ['Hors ligne : ' ~ nom] -%}
+{%- endfor -%}
 {%- for e in states.sensor | selectattr('attributes.device_class', 'defined')
      | selectattr('attributes.device_class', 'eq', 'battery') if e.state | is_number and e.state | float < 20 -%}
   {%- set ns.l = ns.l + ['Pile faible : ' ~ e.name ~ ' (' ~ e.state ~ ' %)'] -%}
 {%- endfor -%}
 {{ ns.l | to_json }}
 {%- endmacro %}
+
+{# Appareils connectés (nœuds ESP32, intégration MQTT) : un appareil est en ligne si au moins une de
+   ses entités répond. Renvoie {"en_ligne": n, "hors_ligne": [noms]} : appareils() | from_json #}
+{% macro appareils() %}
+{%- set ns = namespace(tous=[], en_ligne=[]) -%}
+{%- for e in integration_entities('mqtt') -%}
+  {#- entité MQTT sans appareil (capteur MQTT déclaré en YAML) : device_attr() échouerait -#}
+  {%- set d = device_id(e) -%}
+  {%- set nom = (device_attr(d, 'name') if d else none) or e -%}
+  {%- if nom not in ns.tous %}{% set ns.tous = ns.tous + [nom] %}{% endif -%}
+  {%- if states(e) != 'unavailable' and nom not in ns.en_ligne %}{% set ns.en_ligne = ns.en_ligne + [nom] %}{% endif -%}
+{%- endfor -%}
+{{ {'en_ligne': ns.en_ligne | count, 'hors_ligne': ns.tous | reject('in', ns.en_ligne) | list} | to_json }}
+{%- endmacro %}
+

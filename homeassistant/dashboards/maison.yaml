@@ -41,6 +41,10 @@ views:
                 {% endfor %}
             grid_options: { columns: 12 }
           - type: tile
+            entity: sensor.appareils_connectes
+            name: Appareils connectés
+            grid_options: { columns: 12 }
+          - type: tile
             entity: sensor.climate_salon_temperature
             name: Salon
             vertical: true

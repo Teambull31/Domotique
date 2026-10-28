@@ -13,6 +13,9 @@ from unittest.mock import patch
 
 import yaml
 from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntries
+from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.entity import entity_sources
 from homeassistant.helpers.template import Template, async_load_custom_templates
 import homeassistant.util.dt as dt_util
 
@@ -77,6 +80,8 @@ async def main() -> int:
     shutil.copytree(HERE / "custom_templates", Path(cfgdir) / "custom_templates")
     hass = HomeAssistant(cfgdir)
     await async_load_custom_templates(hass)  # macros (maison.jinja) comme dans un vrai HA
+    await dr.async_load(hass)
+    await er.async_load(hass)
     c = Checker(hass)
     now = dt_util.utcnow()
     presence = GROUPS["senior_presence"]
@@ -218,6 +223,23 @@ async def main() -> int:
             hass.states.async_remove(e)
         for entity_id, (state, attrs) in states.items():
             hass.states.async_set(entity_id, state, {"friendly_name": entity_id.split(".")[1], **attrs})
+
+    # appareils connectés : entités déclarées comme créées par l'intégration MQTT (dans un vrai HA,
+    # integration_entities('mqtt') lit entity_sources, rempli par les entités des nœuds)
+    hass.config_entries = ConfigEntries(hass, {})
+    sources = entity_sources(hass)
+    for eid in ("sensor.climate_salon_temperature", "binary_sensor.door_entree_ouverture"):
+        sources[eid] = {"domain": "mqtt", "custom_component": False}
+    maison({"sensor.climate_salon_temperature": ("21", {"device_class": "temperature"}),
+            "binary_sensor.door_entree_ouverture": ("unavailable", {"device_class": "door"})})
+    appareils_s = maison_sensors["maison_appareils"]
+    c.check("appareils : 1 en ligne, 1 hors ligne", appareils_s["state"], "1 en ligne, 1 hors ligne")
+    c.check("appareils : l'appareil muet est nommé", appareils_s["attributes"]["hors_ligne"], "door_entree_ouverture")
+    c.check("maison : appareil hors ligne signalé", maison_sensors["maison_etat"]["attributes"]["points"],
+            "Hors ligne : binary_sensor.door_entree_ouverture")
+    hass.states.async_set("binary_sensor.door_entree_ouverture", "off", {"device_class": "door"})
+    c.check("appareils : tous en ligne", appareils_s["state"], "2 en ligne")
+    sources.clear()
 
     etat = maison_sensors["maison_etat"]
     maison({"binary_sensor.leak_cuisine_fuite": ("off", {"device_class": "moisture"}),

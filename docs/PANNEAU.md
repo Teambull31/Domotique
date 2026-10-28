@@ -7,7 +7,8 @@ Un même tableau de bord Home Assistant, **Maison** (`homeassistant/dashboards/m
 
 Deux pages, grandes tuiles au doigt :
 - **Accueil** : état de la maison en une phrase (« Tout va bien » / « 2 points à vérifier » + détail :
-  fuite, porte ou portail ouvert, capteur en panne, pile faible), températures, chauffage, éclairage
+  fuite, porte ou portail ouvert, capteur en panne ou hors ligne, pile faible), appareils connectés
+  (« 12 en ligne », ou lesquels ne répondent plus), températures, chauffage, éclairage
   (un appui = allumer/éteindre), portail (ouverture/fermeture **avec confirmation**), volets.
 - **Consommation** : puissance en ce moment, électricité et coût estimé du jour et du mois, histogramme
   des 30 derniers jours.
@@ -25,8 +26,8 @@ Deux pages, grandes tuiles au doigt :
 ## 2. Panneau mural (Raspberry Pi)
 **Matériel** : Raspberry Pi 4 ou 5 (2 Go suffisent), alimentation officielle, carte microSD 16 Go,
 écran tactile 6-7 pouces. Préférer un écran **DSI** (connecteur plat, ex. écran officiel Raspberry Pi) :
-sa luminosité est pilotable, donc tamisée la nuit. Un écran HDMI + USB tactile fonctionne aussi, mais sa
-luminosité se règle sur l'écran.
+sa luminosité est pilotable, donc l'écran se tamise quand on ne s'en sert pas. Un écran HDMI + USB tactile
+fonctionne aussi, mais reste à pleine luminosité (réglage sur l'écran lui-même).
 
 1. Avec Raspberry Pi Imager : **Raspberry Pi OS Lite (64 bits)**, en renseignant WiFi, nom d'utilisateur
    et SSH dans les réglages avancés.
@@ -35,8 +36,11 @@ luminosité se règle sur l'écran.
    sudo ./install-kiosk.sh http://<ip-de-home-assistant>:8123/tableau-maison/accueil
    sudo reboot
    ```
-   Au démarrage, le tableau de bord s'affiche en plein écran (Cage + Chromium, sans bureau). Écran
-   tamisé de 22 h à 7 h (écrans DSI) ; `sudo panneau-ecran 60` pour régler à la main.
+   Au démarrage, le tableau de bord s'affiche en plein écran (Cage + Chromium, sans bureau).
+   **Veille** (écrans DSI) : après 1 min sans contact, l'écran se tamise (15 % le jour, 3 % la nuit :
+   l'état de la maison reste lisible de loin) ; il revient au toucher, et ce premier contact **ne
+   déclenche rien** (pas de lumière allumée ni de portail ouvert en réveillant l'écran). Délai et niveaux
+   dans `/etc/default/panneau-veille`, puis `sudo systemctl restart panneau-veille`.
 3. **Connexion automatique** du panneau à HA (pas de clavier à l'écran) : dans `configuration.yaml`,
    autoriser **la seule adresse IP du Pi** (réservée dans la box) à se connecter en tant que *panneau* :
    ```yaml
@@ -52,6 +56,9 @@ luminosité se règle sur l'écran.
    ```
 4. Écran à l'envers ou en portrait : l'orientation se règle dans `/boot/firmware/cmdline.txt` selon
    l'écran (voir sa documentation, ex. `video=DSI-1:panel_orientation=upside_down`).
+
+Même installation chez chaque proche (ex. le salon d'un parent) : un panneau par site, relié au Home
+Assistant de **ce** site.
 
 ## 3. Tablette des grands-parents
 - **Le plus simple** : application **Home Assistant** (Android/iOS), connectée avec **leur** compte
