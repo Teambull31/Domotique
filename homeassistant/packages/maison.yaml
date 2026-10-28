@@ -1,7 +1,26 @@
 # Package Home Assistant "maison" : consommation, état général et portail. Indépendant du package
 # senior_care (utilisable chez soi comme chez un proche). Copier dans /config/packages/.
 # ADAPTER : sensor.power_tableau_energie (nœud "power" au tableau électrique, pièce "tableau"),
-# le tarif (Paramètres > Entités > Tarif de l'électricité) et le service de notification.
+# le tarif (Paramètres > Entités > Tarif de l'électricité) et le service de notification, à UN seul
+# endroit : le script maison_notifier ci-dessous.
+
+script:
+  maison_notifier:
+    alias: "Maison : prévenir"
+    description: "Notification des alertes de la maison. Seul endroit où choisir le téléphone prévenu."
+    fields:
+      titre: { description: Titre }
+      message: { description: Texte }
+      urgent: { description: "true = sonne même en silencieux (Android : alarm_stream, iOS : critique)" }
+    sequence:
+      - service: notify.notify  # ← remplacer par notify.mobile_app_<téléphone> (vous, ou le proche aidant)
+        data:
+          title: "{{ titre }}"
+          message: "{{ message }}"
+          data: >
+            {{ {'ttl': 0, 'priority': 'high', 'channel': 'alarm_stream',
+                'push': {'sound': {'name': 'default', 'critical': 1, 'volume': 1.0}}}
+               if urgent | default(false) | bool else {} }}
 
 input_number:
   maison_tarif_kwh:
@@ -88,9 +107,9 @@ automation:
              | selectattr('attributes.device_class', 'eq', 'gate') | selectattr('state', 'eq', 'open') | list | count > 0 }}
         for: "00:10:00"
     action:
-      - service: notify.notify  # tous les téléphones de l'app HA ; remplacer par notify.mobile_app_xxx
+      - service: script.maison_notifier
         data:
-          title: "Portail ouvert depuis 10 min"
+          titre: "Portail ouvert depuis 10 min"
           message: >
             {{ states.cover | selectattr('attributes.device_class', 'defined')
                | selectattr('attributes.device_class', 'eq', 'gate') | selectattr('state', 'eq', 'open')
@@ -109,14 +128,14 @@ automation:
         after: "22:30:00"
         before: "06:00:00"
     action:
-      - service: notify.notify  # remplacer par notify.mobile_app_xxx (proche aidant)
+      - service: script.maison_notifier
         data:
-          title: "Portail ouvert en pleine nuit"
+          titre: "Portail ouvert en pleine nuit"
+          urgent: true
           message: >
             {{ states.cover | selectattr('attributes.device_class', 'defined')
                | selectattr('attributes.device_class', 'eq', 'gate') | selectattr('state', 'in', ['open', 'opening'])
                | map(attribute='name') | join(', ') }} s'est ouvert à {{ now().strftime('%H:%M') }}.
-          data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
 
   # Variante « télécommande sacrifiée » (portail non câblable, voir docs/PANNEAU.md) : la position du
   # portail vient d'un nœud « door » sur pile posé au portail (pièce « portail »). HA la transmet au nœud

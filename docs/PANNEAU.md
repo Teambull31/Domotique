@@ -20,6 +20,8 @@ Deux pages, grandes tuiles au doigt :
    `lovelace:` en tête du fichier). Adapter les `entity_id` (lumières, volets, thermostat) ; supprimer les
    tuiles des équipements absents.
 3. Régler **Tarif de l'électricité** (prix TTC du kWh du contrat) dans Paramètres > Entités.
+   Choisir le téléphone prévenu (portail resté ouvert, ouvert la nuit) à un seul endroit : le script
+   `maison_notifier` en tête de `packages/maison.yaml`.
 4. Créer un utilisateur **panneau** (Paramètres > Personnes), **non administrateur** : depuis l'écran, on
    pilote la maison mais on ne modifie pas la configuration.
 

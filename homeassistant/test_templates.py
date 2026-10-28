@@ -249,6 +249,11 @@ async def main() -> int:
     c.check("portail la nuit : en ouverture -> alerte", nuit["trigger"][0]["value_template"], True)
     c.check("portail la nuit : le message nomme le portail", nuit["action"][0]["data"]["message"], "gate_entree_portail")
 
+    notif = MAISON["script"]["maison_notifier"]["sequence"][0]["data"]["data"]
+    c.check("notifier : urgent -> sonne en silencieux", notif, "alarm_stream", {"urgent": True})
+    c.check("notifier : normal -> notification simple", notif, {}, {"urgent": False})
+    c.check("notifier : 'urgent' absent -> notification simple", notif, {})
+
     etat = maison_sensors["maison_etat"]
     maison({"binary_sensor.leak_cuisine_fuite": ("off", {"device_class": "moisture"}),
             "cover.gate_entree_portail": ("closed", {"device_class": "gate"}),
