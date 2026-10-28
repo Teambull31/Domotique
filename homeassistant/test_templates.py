@@ -103,6 +103,22 @@ async def main() -> int:
                   **dict(zip(presence, states))})
         c.check(name, tpl, expected)
 
+    # --- Dernière activité : l'eau compte, sauf écoulement continu ou fuite lente ---
+    derniere = next(b for b in PACKAGE["template"] if "trigger" in b and any(
+        x.get("unique_id") == "senior_derniere_activite" for x in b.get("sensor", [])))
+    derniere_tpl = derniere["sensor"][0]["state"]
+    precedent = State("sensor.derniere_activite_a_la_maison", "2026-01-01T08:00:00+00:00")
+    continu, lente = "binary_sensor.water_compteur_eau_qui_coule_sans_arret", "binary_sensor.water_compteur_fuite_lente_probable"
+    for nom, etats, trig_id, attendu in (
+        ("activité : chasse d'eau tirée -> activité", {continu: "off", lente: "off"}, "eau", "now"),
+        ("activité : eau qui coule sans arrêt -> pas une activité", {continu: "on", lente: "off"}, "eau", "avant"),
+        ("activité : fuite lente -> pas une activité", {continu: "off", lente: "on"}, "eau", "avant"),
+        ("activité : radar (même avec une fuite) -> activité", {continu: "on", lente: "on"}, None, "now")):
+        c.states(etats)
+        rendu = Template(derniere_tpl, hass).async_render({"trigger": {"id": trig_id}, "this": precedent})
+        c.verify(nom, "2026-01-01T08:00" not in str(rendu) if attendu == "now" else str(rendu).strip(),
+                 True if attendu == "now" else "2026-01-01T08:00:00+00:00")
+
     # --- Capteurs à vérifier (compteurs : une alerte par nouveau capteur en problème) ---
     # Nœuds repérés via l'intégration MQTT (entity_sources, rempli dans un vrai HA par les entités)
     hass.config_entries = ConfigEntries(hass, {})

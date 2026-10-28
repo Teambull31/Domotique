@@ -134,7 +134,8 @@ template:
 
   # Horodatage de la dernière activité réelle : quelqu'un entre dans une pièce surveillée, quitte la
   # dernière pièce occupée (il était là jusqu'à cet instant : sans ce cas, 8 h passées au salon
-  # compteraient depuis l'arrivée et déclencheraient une fausse alerte en partant), ou ouvre la porte.
+  # compteraient depuis l'arrivée et déclencheraient une fausse alerte en partant), ouvre la porte, ou
+  # utilise l'eau (compteur d'eau, facultatif : chasse d'eau, robinet, dans les pièces sans radar).
   # Une coupure WiFi d'un capteur (indisponible -> off) ne compte pas. État conservé au redémarrage.
   - trigger:
       - platform: state
@@ -147,12 +148,26 @@ template:
         entity_id: binary_sensor.door_entree_ouverture
         from: "off"  # vraie ouverture (pas un retour d'"indisponible" porte déjà ouverte)
         to: "on"
+      - platform: state
+        id: eau
+        entity_id: sensor.water_compteur_eau_consommee
+        not_from: ["unavailable", "unknown"]
+        not_to: ["unavailable", "unknown"]
     sensor:
       - name: "Dernière activité à la maison"
         unique_id: senior_derniere_activite
         device_class: timestamp
         icon: mdi:account-clock
-        state: "{{ now().isoformat() }}"
+        # Eau qui coule sans arrêt ou fuite lente : ce n'est pas quelqu'un qui agit (une fuite
+        # masquerait une vraie inactivité) : horodatage inchangé.
+        state: >
+          {% if trigger.id == 'eau'
+                and not (is_state('binary_sensor.water_compteur_eau_qui_coule_sans_arret', 'off')
+                         and is_state('binary_sensor.water_compteur_fuite_lente_probable', 'off')) %}
+            {{ this.state }}
+          {% else %}
+            {{ now().isoformat() }}
+          {% endif %}
 
   - trigger:
       - platform: time_pattern
