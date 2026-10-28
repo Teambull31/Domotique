@@ -8,6 +8,7 @@ import sys
 import tempfile
 from datetime import timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 from homeassistant.core import HomeAssistant
@@ -150,6 +151,34 @@ async def main() -> int:
     c.check("fuite : sonde muette sans fuite en cours -> pas d'alerte", leak_tpl, False,
             leak(["unavailable", "off"], "off"))
     c.check("fuite : toutes les sondes sèches -> fin d'alerte", leak_tpl, False, leak(["off", "off"], "on"))
+
+    # --- Inactivité à signaler (plage 9 h - 21 h) et alerte répétée ---
+    inact = next(sensor["state"] for block in PACKAGE["template"] for sensor in block.get("binary_sensor", [])
+                 if sensor.get("unique_id") == "senior_inactivite_a_signaler")
+    tz = dt_util.get_default_time_zone()
+
+    def at(hour, activite="off", alertes="on"):
+        c.states({"binary_sensor.activite_recente_a_la_maison": activite,
+                  "input_boolean.senior_alerts_enabled": alertes})
+        return patch("homeassistant.util.dt.now", return_value=dt_util.now(tz).replace(hour=hour, minute=0))
+
+    for name, hour, act, al, expected in [
+        ("inactivité : 14 h sans activité -> alerte", 14, "off", "on", True),
+        ("inactivité : 22 h sans activité -> rien la nuit", 22, "off", "on", False),
+        ("inactivité : 8 h -> rien avant 9 h", 8, "off", "on", False),
+        ("inactivité : alertes coupées (absence) -> rien", 14, "off", "off", False),
+        ("inactivité : activité détectée -> rien", 14, "on", "on", False),
+    ]:
+        with at(hour, act, al):
+            c.check(name, inact, expected)
+    alert_cfg = PACKAGE["alert"]["inactivite"]
+    c.states({"sensor.derniere_activite_a_la_maison": (now - timedelta(hours=9)).isoformat(),
+              "input_number.senior_inactivity_hours": "8"})
+    c.check("inactivité : message avec durée", alert_cfg["message"], "depuis 8 h")
+    c.states({"binary_sensor.activite_recente_a_la_maison": "off"})
+    c.check("inactivité : fin à 21 h sans activité -> le dire", alert_cfg["done_message"], "toujours aucune activité")
+    c.states({"binary_sensor.activite_recente_a_la_maison": "on"})
+    c.check("inactivité : fin par activité -> rassurer", alert_cfg["done_message"], "Activité de nouveau détectée")
 
     # --- Bilan quotidien ---
     report = automation("Senior - bilan quotidien")["action"][0]["data"]["message"]

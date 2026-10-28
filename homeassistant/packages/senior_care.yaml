@@ -167,6 +167,14 @@ template:
              or (now() - last).total_seconds() < h * 3600 }}
 
   - binary_sensor:
+      # Inactivité à signaler au proche : pas d'activité récente, alertes actives, entre 9 h et 21 h
+      # (la nuit, l'absence de mouvement est normale ; si elle dure, l'alerte part à 9 h).
+      - name: "Inactivité à signaler"
+        unique_id: senior_inactivite_a_signaler
+        state: >
+          {{ is_state('binary_sensor.activite_recente_a_la_maison', 'off')
+             and is_state('input_boolean.senior_alerts_enabled', 'on')
+             and today_at('09:00') <= now() < today_at('21:00') }}
       - name: "Fuite d'eau quelque part"
         unique_id: senior_fuite_quelque_part
         device_class: moisture
@@ -181,6 +189,27 @@ template:
 # Fuite : alerte immédiate, rappels 5 min puis 15 min après, puis toutes les 30 min, tant que l'eau est là et que le proche n'a pas
 # acquitté (Paramètres > Entités > alert.fuite_d_eau > Acquitter, ou carte du tableau de bord).
 alert:
+  # Inactivité : alerte immédiate puis rappel toutes les heures tant que personne n'a acquitté
+  # (un appel sans réponse, une notification balayée ne doivent pas clore le sujet).
+  inactivite:
+    name: Aucune activité détectée
+    entity_id: binary_sensor.inactivite_a_signaler
+    state: "on"
+    repeat: 60
+    can_acknowledge: true
+    skip_first: false
+    title: "Pas d'activité détectée"
+    message: >
+      {% set last = states('sensor.derniere_activite_a_la_maison') | as_datetime %}
+      Aucune présence détectée depuis {{ states('input_number.senior_inactivity_hours') | int(8) }} h
+      {{- (' (dernière activité à ' ~ as_local(last).strftime('%H:%M') ~ ')') if last else '' }}.
+      Un appel est conseillé.
+    done_message: >
+      {{ 'Activité de nouveau détectée à la maison.' if is_state('binary_sensor.activite_recente_a_la_maison', 'on')
+         else 'Fin de la surveillance de jour (21 h ou alertes coupées) : toujours aucune activité détectée.' }}
+    notifiers: [mobile_app_proche]
+    data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
+
   fuite_d_eau:
     name: Fuite d'eau
     entity_id: binary_sensor.fuite_d_eau_quelque_part
@@ -219,31 +248,6 @@ script:
           message: "2 notifications envoyées au proche à {{ now().strftime('%H:%M') }}. Vérifier avec lui qu'elles sont arrivées et que la 2e a sonné."
 
 automation:
-  - alias: "Senior - aucune activité pendant la journée"
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.activite_recente_a_la_maison
-        to: "off"
-      # passé à "off" pendant la nuit (hors plage horaire) : on alerte dès 9 h
-      - platform: time
-        at: "09:00:00"
-    condition:
-      - condition: state
-        entity_id: binary_sensor.activite_recente_a_la_maison
-        state: "off"
-      - condition: state
-        entity_id: input_boolean.senior_alerts_enabled
-        state: "on"
-      - condition: time
-        after: "09:00:00"
-        before: "21:00:00"
-    action:
-      - service: notify.mobile_app_proche
-        data:
-          title: "Pas d'activité détectée"
-          message: "Aucune présence détectée à la maison depuis un moment. Un appel serait bienvenu."
-          data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
-
   # Toujours active, même alertes coupées : la nuit, une maison vide dont la porte s'ouvre = intrusion.
   - alias: "Senior - porte d'entrée ouverte la nuit"
     trigger:

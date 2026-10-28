@@ -51,6 +51,8 @@ views:
             name: Alertes actives (couper en cas d'absence ; fuite, porte la nuit et pannes restent actives)
           - entity: input_number.senior_inactivity_hours
             name: Alerte si aucune présence pendant (h)
+          - entity: alert.inactivite
+            name: Alerte inactivité (cliquer pour acquitter)
           - entity: alert.fuite_d_eau
             name: Alerte fuite (cliquer pour acquitter)
           - entity: script.senior_test_alertes
