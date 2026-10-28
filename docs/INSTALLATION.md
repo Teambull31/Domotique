@@ -48,12 +48,19 @@
 - [ ] Volets : ouverture/fermeture complètes, puis position 50 %.
 - [ ] Puissance : allumer un appareil de puissance connue (bouilloire ~2000 W), la mesure suit.
 - [ ] Pile : niveau de batterie cohérent (accu chargé ≈ 100 %).
+- [ ] Panne simulée : débrancher le radar (ou une sonde de température) -> « Défaut » en 10 s dans HA,
+      notification « Capteur à vérifier » après 10 min ; rebrancher.
+- [ ] Inactivité (à faire un après-midi où la maison est vide) : régler **Alerte si aucune présence
+      détectée** sur 2 h -> alerte au bout de 2 h, rappel 1 h plus tard ; acquitter, puis remettre le
+      réglage habituel (8 h par défaut).
+- [ ] Le premier soir : le **bilan de la journée** arrive à 20 h sur le téléphone du proche.
 
 ## 7. Remise au client
 - [ ] Personne âgée : rien à faire, rien à toucher ; expliquer simplement ce qui est surveillé (et ce
       qui ne l'est pas : ce n'est **ni une téléassistance ni un détecteur de chute**).
-- [ ] Proche aidant : recevoir/acquitter une alerte, couper les alertes en cas d'absence
-      (**Alertes tranquillité actives**), qui appeler en cas de panne.
+- [ ] Proche aidant : les alertes fuite et inactivité **se répètent jusqu'à acquittement** (tableau de bord
+      Tranquillité > Alertes) ; couper les alertes en cas d'absence (**Alertes tranquillité actives** :
+      fuite, porte la nuit et pannes restent actives) ; qui appeler en cas de panne.
 - [ ] Consentement RGPD signé (personne âgée et proche), liste des capteurs et de leur emplacement.
 
 ## 8. Entretien
