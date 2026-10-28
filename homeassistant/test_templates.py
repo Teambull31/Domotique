@@ -301,6 +301,18 @@ async def main() -> int:
     maison_sensors = {s["unique_id"]: s for s in MAISON["template"][0]["sensor"]}
     c.states({"sensor.electricite_aujourd_hui": "12.4", "input_number.maison_tarif_kwh": "0.25"})
     c.check("maison : coût du jour = kWh x tarif", maison_sensors["maison_cout_jour"]["state"], 3.1)
+    c.states({"sensor.eau_aujourd_hui": "143", "input_number.maison_tarif_eau": "4.3"})
+    c.check("maison : coût de l'eau = litres / 1000 x tarif au m³", maison_sensors["maison_cout_eau_jour"]["state"],
+            0.61)
+    c.states({"sensor.eau_aujourd_hui": "unavailable"})
+    c.check("maison : pas de compteur d'eau -> coût indisponible",
+            maison_sensors["maison_cout_eau_jour"]["availability"], False)
+    tarif_eau = next(a for a in MAISON["automation"] if a["alias"] == "Maison - tarif de l'eau par défaut")
+    c.states({"input_number.maison_tarif_eau": "0"})
+    c.check("maison : tarif de l'eau jamais saisi -> valeur par défaut", tarif_eau["condition"][0]["value_template"],
+            True)
+    c.states({"input_number.maison_tarif_eau": "3.85"})
+    c.check("maison : tarif de l'eau saisi conservé", tarif_eau["condition"][0]["value_template"], False)
 
     def maison(states):
         for e in list(hass.states.async_entity_ids()):  # repartir d'une maison vide

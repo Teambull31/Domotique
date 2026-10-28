@@ -341,6 +341,44 @@ void test_appel_pas_de_faux_appel() {
   TEST_ASSERT_FALSE(domo::appelDemande(false, true, false));  // réveil au relâchement d'un appui tenu
 }
 
+// --- compteur d'eau ---
+static const unsigned long MIN_MS = 60000UL;
+
+void test_eau_robinet_oublie_detecte() {
+  domo::ContinuousFlow f(5 * MIN_MS);
+  for (unsigned long t = 0; t <= 61 * MIN_MS; t += 3000) f.pulse(t);  // 1 L toutes les 3 s pendant 1 h
+  TEST_ASSERT_TRUE(f.runMs(61 * MIN_MS) >= 60 * MIN_MS);
+  TEST_ASSERT_EQUAL_UINT32(0, f.runMs(61 * MIN_MS + 5 * MIN_MS + 1));  // robinet fermé : fini
+}
+void test_eau_usages_separes_pas_continus() {
+  domo::ContinuousFlow f(5 * MIN_MS);
+  for (int lavage = 0; lavage < 6; lavage++)                    // 6 remplissages de 2 min, 15 min d'écart
+    for (unsigned long t = 0; t < 2 * MIN_MS; t += 10000) f.pulse(lavage * 15 * MIN_MS + t);
+  TEST_ASSERT_TRUE(f.runMs(5 * 15 * MIN_MS + 2 * MIN_MS) < 5 * MIN_MS);
+}
+void test_eau_petite_fuite_continue() {
+  domo::ContinuousFlow f(5 * MIN_MS);
+  for (unsigned long t = 0; t <= 90 * MIN_MS; t += 4 * MIN_MS) f.pulse(t);  // 1 L toutes les 4 min
+  TEST_ASSERT_TRUE(f.runMs(88 * MIN_MS) >= 60 * MIN_MS);
+}
+void test_eau_fuite_lente_sans_pause_nocturne() {
+  static const unsigned long H = 60 * MIN_MS;
+  domo::SlowLeak fuite(3 * H, 24 * H);
+  for (unsigned long t = 0; t <= 30 * H; t += 40 * MIN_MS) fuite.pulse(t);  // goutte-à-goutte 30 h
+  TEST_ASSERT_TRUE(fuite.suspected(30 * H));
+  domo::SlowLeak normal(3 * H, 24 * H);
+  for (unsigned long jour = 0; jour < 3; jour++)  // eau de 7 h à 23 h, rien la nuit
+    for (unsigned long t = 7 * H; t <= 23 * H; t += 30 * MIN_MS) normal.pulse(jour * 24 * H + t);
+  TEST_ASSERT_FALSE(normal.suspected(2 * 24 * H + 23 * H));
+  TEST_ASSERT_FALSE(fuite.suspected(30 * H + 3 * H));  // fuite réparée : 3 h sans eau, fin du soupçon
+}
+void test_eau_debit() {
+  TEST_ASSERT_FLOAT_WITHIN(0.01, 20.0f, domo::flowLpm(1.0f, 3000, 1000));   // 1 L / 3 s = 20 L/min
+  TEST_ASSERT_FLOAT_WITHIN(0.01, 0.25f, domo::flowLpm(1.0f, 4 * MIN_MS, MIN_MS));
+  TEST_ASSERT_EQUAL_FLOAT(0.0f, domo::flowLpm(1.0f, 3000, 121000));         // arrêté depuis 2 min
+  TEST_ASSERT_EQUAL_FLOAT(0.0f, domo::flowLpm(1.0f, 0, 0));                 // une seule impulsion
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -394,5 +432,10 @@ int main() {
   RUN_TEST(test_rebond_bouton_coince_au_demarrage_sans_front);
   RUN_TEST(test_appel_appui_bref_relache_avant_le_demarrage);
   RUN_TEST(test_appel_pas_de_faux_appel);
+  RUN_TEST(test_eau_robinet_oublie_detecte);
+  RUN_TEST(test_eau_usages_separes_pas_continus);
+  RUN_TEST(test_eau_petite_fuite_continue);
+  RUN_TEST(test_eau_fuite_lente_sans_pause_nocturne);
+  RUN_TEST(test_eau_debit);
   return UNITY_END();
 }

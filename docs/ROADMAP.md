@@ -8,6 +8,8 @@ Tout est compilé et testé sur PC (logique) ; **rien n'est encore validé sur d
 - [x] `climate` : BME280 temp/humidité/pression (une carte par pièce)
 - [x] `air` : CO₂ (SCD40) + particules (PMS5003) — salon, chambre, bureau
 - [x] `power` : suivi conso (PZEM-004T v3) au tableau électrique
+- [x] `water` : compteur d'eau à impulsions (consommation, coût, eau qui coule sans arrêt, fuite lente)
+- [ ] `water` sur pile (compteur dans un regard extérieur, sans prise)
 
 ## Phase 2 — Sécurité
 - [x] `door` : contacts d'ouverture portes/fenêtres (reed, deep-sleep sur pile)

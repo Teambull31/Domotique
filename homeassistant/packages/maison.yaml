@@ -1,6 +1,7 @@
 # Package Home Assistant "maison" : consommation, état général et portail. Indépendant du package
 # senior_care (utilisable chez soi comme chez un proche). Copier dans /config/packages/.
 # ADAPTER : sensor.power_tableau_energie (nœud "power" au tableau électrique, pièce "tableau"),
+# sensor.water_compteur_eau_consommee (nœud "water" au compteur d'eau, pièce "compteur", facultatif),
 # le tarif (Paramètres > Entités > Tarif de l'électricité) et le service de notification, à UN seul
 # endroit : le script maison_notifier ci-dessous.
 
@@ -36,6 +37,14 @@ input_number:
     mode: box
     unit_of_measurement: "€/kWh"
     icon: mdi:currency-eur
+  maison_tarif_eau:
+    name: Tarif de l'eau (€/m³)
+    min: 0
+    max: 20
+    step: 0.01
+    mode: box
+    unit_of_measurement: "€/m³"
+    icon: mdi:water
 input_boolean:
   maison_reglages_initialises:
     name: "Maison : réglages par défaut appliqués"
@@ -53,6 +62,17 @@ utility_meter:
     name: Électricité ce mois-ci
     unique_id: maison_energie_mois
     source: sensor.power_tableau_energie
+    cycle: monthly
+  # Eau (nœud « water ») : sensor.eau_aujourd_hui, sensor.eau_ce_mois_ci (litres)
+  eau_aujourd_hui:
+    name: Eau aujourd'hui
+    unique_id: maison_eau_jour
+    source: sensor.water_compteur_eau_consommee
+    cycle: daily
+  eau_ce_mois:
+    name: Eau ce mois-ci
+    unique_id: maison_eau_mois
+    source: sensor.water_compteur_eau_consommee
     cycle: monthly
 
 template:
@@ -75,6 +95,24 @@ template:
           {% set kwh = states('sensor.electricite_ce_mois_ci') | float(none) %}
           {{ (kwh * states('input_number.maison_tarif_kwh') | float(0)) | round(2) if kwh is not none else none }}
         availability: "{{ states('sensor.electricite_ce_mois_ci') | is_number }}"
+      - name: "Coût de l'eau aujourd'hui"
+        unique_id: maison_cout_eau_jour
+        unit_of_measurement: "€"
+        device_class: monetary
+        icon: mdi:water-circle
+        state: >
+          {% set l = states('sensor.eau_aujourd_hui') | float(none) %}
+          {{ (l / 1000 * states('input_number.maison_tarif_eau') | float(0)) | round(2) if l is not none else none }}
+        availability: "{{ states('sensor.eau_aujourd_hui') | is_number }}"
+      - name: "Coût de l'eau ce mois-ci"
+        unique_id: maison_cout_eau_mois
+        unit_of_measurement: "€"
+        device_class: monetary
+        icon: mdi:water-circle
+        state: >
+          {% set l = states('sensor.eau_ce_mois_ci') | float(none) %}
+          {{ (l / 1000 * states('input_number.maison_tarif_eau') | float(0)) | round(2) if l is not none else none }}
+        availability: "{{ states('sensor.eau_ce_mois_ci') | is_number }}"
 
       # État de la maison en une phrase, pour l'écran d'accueil (tablette, panneau mural).
       # Liste calculée par la macro custom_templates/maison.jinja (à copier dans /config/custom_templates/),
@@ -126,6 +164,22 @@ automation:
       - service: input_boolean.turn_on
         target:
           entity_id: input_boolean.maison_reglages_initialises
+
+  # Tarif de l'eau jamais saisi (0, aussi sur une installation antérieure à son ajout) : moyenne en
+  # France, assainissement compris, à remplacer par celui de la facture.
+  - alias: "Maison - tarif de l'eau par défaut"
+    trigger:
+      - platform: homeassistant
+        event: start
+    condition:
+      - condition: template
+        value_template: "{{ states('input_number.maison_tarif_eau') | float(0) == 0 }}"
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.maison_tarif_eau
+        data:
+          value: 4.3
 
   - alias: "Maison - portail resté ouvert"
     trigger:

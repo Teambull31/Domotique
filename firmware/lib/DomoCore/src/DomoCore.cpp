@@ -294,8 +294,10 @@ void DomoCore::publishDiscovery() {
     if (e.deviceClass.length()) doc["device_class"] = e.deviceClass;
     if (e.unit.length()) doc["unit_of_measurement"] = e.unit;
 
+    // Compteurs (énergie, eau, gaz) : total croissant, pour les consommations par jour / mois de HA
     if (e.component == "sensor" && e.unit.length())
-      doc["state_class"] = (e.deviceClass == "energy") ? "total_increasing" : "measurement";
+      doc["state_class"] = (e.deviceClass == "energy" || e.deviceClass == "water" || e.deviceClass == "gas")
+                               ? "total_increasing" : "measurement";
     if (e.component == "binary_sensor" || e.component == "switch") {
       doc["payload_on"] = "True";      // ArduinoJson émet true -> Jinja "True"
       doc["payload_off"] = "False";

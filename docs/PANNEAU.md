@@ -11,8 +11,9 @@ Deux pages, grandes tuiles au doigt :
   fuite, porte ou portail ouvert, capteur en panne ou hors ligne, pile faible), appareils connectés
   (« 12 en ligne », ou lesquels ne répondent plus), températures, chauffage, éclairage
   (un appui = allumer/éteindre), portail (ouverture/fermeture **avec confirmation**), volets.
-- **Consommation** : puissance en ce moment, électricité et coût estimé du jour et du mois, histogramme
-  des 30 derniers jours.
+- **Consommation** : puissance en ce moment, électricité et eau (nœud `water`, facultatif) avec leur coût
+  estimé du jour et du mois, histogrammes des 30 derniers jours. Eau qui coule sans arrêt ou fuite lente :
+  signalées dans l'état de la maison (et alerte fuite chez les proches âgés).
 
 ## 1. Côté Home Assistant (une fois par site)
 1. Copier `homeassistant/packages/maison.yaml` dans `/config/packages/` et

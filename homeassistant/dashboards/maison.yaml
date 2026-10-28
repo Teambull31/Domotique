@@ -172,6 +172,11 @@ views:
             needle: true
             severity: { green: 0, yellow: 3000, red: 6000 }
             grid_options: { columns: 12 }
+          # Eau (nœud « water », facultatif : supprimer ces tuiles sans compteur d'eau)
+          - type: tile
+            entity: sensor.water_compteur_debit
+            name: Eau qui coule
+            grid_options: { columns: 12 }
 
       - type: grid
         cards:
@@ -185,6 +190,14 @@ views:
             entity: sensor.cout_de_l_electricite_aujourd_hui
             name: Coût estimé
             vertical: true
+          - type: tile
+            entity: sensor.eau_aujourd_hui
+            name: Eau
+            vertical: true
+          - type: tile
+            entity: sensor.cout_de_l_eau_aujourd_hui
+            name: Coût de l'eau
+            vertical: true
           - type: heading
             heading: Ce mois-ci
           - type: tile
@@ -195,6 +208,14 @@ views:
             entity: sensor.cout_de_l_electricite_ce_mois_ci
             name: Coût estimé
             vertical: true
+          - type: tile
+            entity: sensor.eau_ce_mois_ci
+            name: Eau
+            vertical: true
+          - type: tile
+            entity: sensor.cout_de_l_eau_ce_mois_ci
+            name: Coût de l'eau
+            vertical: true
 
       - type: grid
         cards:
@@ -204,6 +225,15 @@ views:
             entities:
               - entity: sensor.power_tableau_energie
                 name: Électricité (kWh par jour)
+            chart_type: bar
+            period: day
+            days_to_show: 30
+            stat_types: [change]
+            grid_options: { columns: 12, rows: 5 }
+          - type: statistics-graph
+            entities:
+              - entity: sensor.water_compteur_eau_consommee
+                name: Eau (litres par jour)
             chart_type: bar
             period: day
             days_to_show: 30

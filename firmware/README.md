@@ -5,6 +5,7 @@
 | `climate` | BME280 | température, humidité, pression |
 | `air` | SCD40 + PMS5003 | CO2, particules (PMS en veille entre deux mesures) |
 | `power` | PZEM-004T v3 | tension, courant, puissance, énergie (kWh) |
+| `water` | contact reed / sortie impulsions du compteur | eau consommée (litres, index du compteur), débit, eau qui coule sans arrêt, fuite lente probable (secteur) |
 | `door` | contact reed, pile | ouverture porte/fenêtre (deep sleep, ouverture brève non perdue) |
 | `call` | bouton + voyant, pile | bouton d'appel : alerte au proche répétée jusqu'à prise en compte, voyant de confirmation |
 | `leak` | sonde d'eau, pile | fuite (deep sleep, confirmée sur 2 lectures) |
@@ -29,7 +30,7 @@ Chaque nœud existe pour 3 cartes : `<nœud>` (ESP32-DevKitC), `<nœud>-c3` (ESP
 | Contact porte / sonde fuite (réveil) | 33 | 3 | 6 |
 | Mesure pile (ADC) | 34 | 1 | 7 |
 | Voyant (bouton d'appel) | 26 | 4 | 4 |
-| Fin de course fermé / ouvert (portail), boutons montée / descente (volet), bouton lumière (présence : entrée 1) | 33 / 32 | 3 / 10 | 6 / 15 |
+| Fin de course fermé / ouvert (portail), boutons montée / descente (volet), bouton lumière (présence : entrée 1), impulsions du compteur d'eau (entrée 1) | 33 / 32 | 3 / 10 | 6 / 15 |
 | Bouton BOOT (configuration) | 0 | 9 | 0 |
 
 Source : `lib/DomoCore/src/DomoPins.h`. Sur C3, le réveil deep sleep n'est possible que sur GPIO0..5 et le

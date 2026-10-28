@@ -250,6 +250,53 @@ inline bool appelDemande(bool enfonce, bool reveilParBouton, bool armeSurAppui) 
   return enfonce || (reveilParBouton && armeSurAppui);
 }
 
+// Compteur d'eau : l'eau coule « sans arrêt » tant que les impulsions se suivent à moins de `gapMs`
+// (une petite fuite ne donne qu'une impulsion toutes les quelques minutes). runMs = durée depuis le
+// début de l'écoulement en cours, 0 s'il est arrêté (robinet oublié, chasse d'eau qui coule).
+class ContinuousFlow {
+public:
+  explicit ContinuousFlow(unsigned long gapMs) : gap_(gapMs) {}
+  void pulse(unsigned long now) {
+    if (!active_ || now - last_ > gap_) start_ = now;
+    active_ = true;
+    last_ = now;
+  }
+  unsigned long runMs(unsigned long now) const { return (active_ && now - last_ <= gap_) ? now - start_ : 0; }
+
+private:
+  unsigned long gap_, start_ = 0, last_ = 0;
+  bool active_ = false;
+};
+
+// Fuite lente : dans une maison, l'eau s'arrête des heures chaque nuit ; une fuite (goutte-à-goutte,
+// chasse d'eau) l'empêche. Suspectée si aucune pause d'au moins `quietMs` depuis `windowMs`.
+class SlowLeak {
+public:
+  SlowLeak(unsigned long quietMs, unsigned long windowMs) : quiet_(quietMs), window_(windowMs) {}
+  void pulse(unsigned long now) {
+    if (!seen_ || now - last_ >= quiet_) calmAt_ = now;  // la pause qui se termine était assez longue
+    seen_ = true;
+    last_ = now;
+  }
+  bool suspected(unsigned long now) const {
+    if (!seen_ || now - last_ >= quiet_) return false;  // à l'arrêt depuis assez longtemps
+    return now - calmAt_ >= window_;
+  }
+
+private:
+  unsigned long quiet_, window_, last_ = 0, calmAt_ = 0;
+  bool seen_ = false;
+};
+
+// Débit (L/min) d'après l'intervalle entre les deux dernières impulsions ; 0 si plus d'impulsion
+// depuis 2 intervalles (au moins 2 min) : l'eau s'est arrêtée.
+inline float flowLpm(float litresPerPulse, unsigned long intervalMs, unsigned long sinceLastMs) {
+  if (intervalMs == 0) return 0;
+  unsigned long stop = intervalMs * 2 > 120000UL ? intervalMs * 2 : 120000UL;
+  if (sinceLastMs > stop) return 0;
+  return litresPerPulse * 60000.0f / (float)intervalMs;
+}
+
 // Pile Li-ion : % entre 3,3 V (vide) et 4,2 V (pleine), borné.
 inline float batteryPercent(float volts) {
   float p = (volts - 3.3f) / (4.2f - 3.3f) * 100.0f;

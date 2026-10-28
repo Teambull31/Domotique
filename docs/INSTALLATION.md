@@ -30,6 +30,9 @@
 - [ ] Climat / thermostat : comparer à un thermomètre de référence posé 30 min à côté, saisir
       **Correction température**.
 - [ ] Thermostat : consigne de confort, vérifier le clic du relais en baissant puis remontant la consigne.
+- [ ] Compteur d'eau : **Litres par impulsion** (indiqué sur le compteur ou l'émetteur, souvent 1 ou 10 L),
+      **Index du compteur** (relevé sur le cadran, en m³), **Tarif de l'eau** (facture, €/m³) ;
+      **Alerte eau qui coule après** : 60 min par défaut (plus si un jardin est arrosé longtemps).
 
 ## 5. Alertes « tranquillité »
 - [ ] Copier `homeassistant/packages/senior_care.yaml` dans `/config/packages/` et
@@ -53,6 +56,8 @@
 - [ ] Volets : ouverture/fermeture complètes, puis position 50 %. Boutons muraux : un appui = course
       complète, un appui pendant la course = arrêt ; essayer aussi **WiFi coupé** (box débranchée).
 - [ ] Puissance : allumer un appareil de puissance connue (bouilloire ~2000 W), la mesure suit.
+- [ ] Eau : remplir un seau de 10 L, « Eau consommée » augmente de 10 L (± 1 impulsion) et le débit
+      s'affiche ; l'index de HA suit celui du cadran.
 - [ ] Bouton d'appel : appui -> voyant allumé 3 s, alerte « Appel à l'aide » sur le téléphone du proche,
       rappel 5 min plus tard ; éteindre « Appel en cours ». Montrer le bouton à la personne âgée.
 - [ ] Pile : niveau de batterie cohérent (accu chargé ≈ 100 %).

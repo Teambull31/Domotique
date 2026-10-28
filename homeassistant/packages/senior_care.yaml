@@ -80,6 +80,8 @@ group:
     entities:
       - binary_sensor.leak_cuisine_fuite
       - binary_sensor.leak_salle_de_bain_fuite
+      # compteur d'eau (nœud « water », facultatif) : robinet oublié, chasse d'eau qui coule
+      - binary_sensor.water_compteur_eau_qui_coule_sans_arret
   senior_boutons_appel:
     name: "Tranquillité : boutons d'appel"
     entities:
