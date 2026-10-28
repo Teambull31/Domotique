@@ -70,7 +70,8 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 if ! grep -q "GET /rendu-ok" /tmp/http.log; then
-  grep -E "\[ERROR\]|FATAL" /tmp/kiosque.log | head -10 >&2
+  ls -l /dev/dri >&2 2>/dev/null || echo "pas de /dev/dri" >&2
+  grep -E "Panneau|\[ERROR\]|FATAL|rror" /tmp/kiosque.log | head -20 >&2
   echec "le tableau de bord n'a pas été affiché par le kiosque"
 fi
-echo "OK : kiosque lancé, tableau de bord affiché (Cage + $(basename "$nav"), rendu logiciel)"
+echo "OK : kiosque lancé, tableau de bord affiché (Cage + $(basename "$nav")) ; $(grep -h "^Panneau" /tmp/kiosque.log | tr '\n' ' ')"

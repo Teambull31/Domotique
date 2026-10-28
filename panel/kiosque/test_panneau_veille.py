@@ -232,6 +232,49 @@ class TestLanceur(unittest.TestCase):
         self.assertIn("URL absente", out)
 
 
+# Faux cage : échoue en rendu matériel (pilote 3D inutilisable), fonctionne en rendu logiciel
+FAUX_CAGE = r"""#!/bin/bash
+echo "cage WLR_RENDERER=${WLR_RENDERER:-} $*"
+[[ "${WLR_RENDERER:-}" == pixman ]] || exit 1
+"""
+
+
+def lancer_vraiment(env, delai_echec="20"):
+    """Lanceur réel (sans PANNEAU_ESSAI) avec un faux cage ; nœud de rendu présent."""
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "cage").write_text(FAUX_CAGE)
+        (Path(d) / "cage").chmod(0o755)
+        (Path(d) / "renderD128").write_text("")
+        r = subprocess.run(["bash", str(ICI / "lancer.sh")], capture_output=True, text=True,
+                           env={"PATH": f"{d}:{os.environ['PATH']}", "PANNEAU_DRI": d,
+                                "PANNEAU_DELAI_ECHEC": delai_echec, "NAVIGATEUR": "/usr/bin/chromium",
+                                "URL": "http://ha:8123/", **env})
+    return r.returncode, r.stdout, r.stderr
+
+
+class TestRepliRenduLogiciel(unittest.TestCase):
+    def test_pilote_inutilisable_repli_automatique(self):
+        code, out, err = lancer_vraiment({})
+        essais = out.strip().splitlines()
+        self.assertEqual(len(essais), 2)
+        self.assertIn("WLR_RENDERER= ", essais[0])
+        self.assertIn("WLR_RENDERER=pixman", essais[1])
+        self.assertIn("--disable-gpu", essais[1])
+        self.assertIn("passage au rendu logiciel", err)
+        self.assertEqual(code, 0)
+
+    def test_rendu_force_respecte(self):
+        code, out, _ = lancer_vraiment({"RENDU": "gpu"})
+        self.assertEqual(len(out.strip().splitlines()), 1)  # pas de repli : choix de l'installateur
+        self.assertEqual(code, 1)
+
+    def test_arret_tardif_pas_de_repli(self):
+        # Cage arrêté après le délai (redémarrage nocturne, arrêt normal) : pas un pilote défaillant
+        code, out, _ = lancer_vraiment({}, delai_echec="0")
+        self.assertEqual(len(out.strip().splitlines()), 1)
+        self.assertEqual(code, 1)
+
+
 # Faux apt-cache : dépôts de Raspberry Pi OS Bookworm, Debian/Armbian, Ubuntu (Chromium en snap).
 # Sortie longue comme le vrai : un « grep -q » qui s'arrête tôt lui envoie SIGPIPE (piège de pipefail).
 FAUX_APT = r"""#!/bin/bash

@@ -10,7 +10,8 @@ NAVIGATEUR="${NAVIGATEUR:-$(command -v chromium-browser || command -v chromium |
 
 # Rendu : « gpu » (accélération graphique), « logiciel » (carte dont l'image n'a pas de pilote 3D,
 # fréquent sur les cartes ARM hors Raspberry Pi : sinon écran noir), « auto » = logiciel si la carte
-# n'expose aucun nœud de rendu graphique.
+# n'expose aucun nœud de rendu graphique, ou si le rendu matériel échoue au démarrage (nœud présent
+# mais pilote inutilisable).
 rendu="${RENDU:-auto}"
 if [[ "$rendu" == auto ]]; then
   rendu=gpu
@@ -32,4 +33,19 @@ if [[ -n "${PANNEAU_ESSAI:-}" ]]; then
   echo "rendu=$rendu WLR_RENDERER=${WLR_RENDERER:-} cage -d -- $NAVIGATEUR ${flags[*]} $URL"
   exit 0
 fi
-exec cage -d -- "$NAVIGATEUR" "${flags[@]}" "$URL"
+echo "Panneau : rendu $rendu" >&2  # visible dans journalctl -u panneau
+if [[ "$rendu" == logiciel || "${RENDU:-auto}" != auto ]]; then
+  exec cage -d -- "$NAVIGATEUR" "${flags[@]}" "$URL"
+fi
+
+# Rendu matériel choisi automatiquement : Cage qui s'arrête en erreur dès le démarrage = pilote
+# inutilisable -> nouvel essai en rendu logiciel, au lieu d'un écran noir qui redémarre en boucle.
+debut=$SECONDS
+code=0
+cage -d -- "$NAVIGATEUR" "${flags[@]}" "$URL" || code=$?
+if ((code != 0 && SECONDS - debut < ${PANNEAU_DELAI_ECHEC:-20})); then
+  echo "Panneau : rendu matériel impossible (code $code), passage au rendu logiciel" >&2
+  export WLR_RENDERER=pixman
+  exec cage -d -- "$NAVIGATEUR" "${flags[@]}" --disable-gpu "$URL"
+fi
+exit "$code"
