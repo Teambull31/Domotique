@@ -130,8 +130,13 @@ template:
       - name: "Fuite d'eau quelque part"
         unique_id: senior_fuite_quelque_part
         device_class: moisture
+        # Une sonde qui se tait PENDANT une fuite (eau sur le boîtier, pile noyée) ne doit pas faire
+        # croire que l'eau est partie : déjà en alerte, on le reste tant qu'une sonde est muette.
         state: >
-          {{ expand('group.senior_fuites') | selectattr('state', 'eq', 'on') | list | count > 0 }}
+          {% set sondes = expand('group.senior_fuites') %}
+          {{ sondes | selectattr('state', 'eq', 'on') | list | count > 0
+             or (this.state == 'on'
+                 and sondes | selectattr('state', 'in', ['unavailable', 'unknown']) | list | count > 0) }}
 
 # Fuite : alerte immédiate, rappels 5 min puis 15 min après, puis toutes les 30 min, tant que l'eau est là et que le proche n'a pas
 # acquitté (Paramètres > Entités > alert.fuite_d_eau > Acquitter, ou carte du tableau de bord).
@@ -147,7 +152,7 @@ alert:
     message: >
       De l'eau est détectée :
       {{ expand('group.senior_fuites') | selectattr('state', 'eq', 'on') | map(attribute='name') | join(', ') }}.
-    done_message: "Fuite d'eau : plus d'eau détectée."
+    done_message: "Fuite d'eau : plus d'eau détectée par les sondes."
     notifiers: [mobile_app_proche]
     data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
 

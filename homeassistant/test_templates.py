@@ -104,6 +104,23 @@ async def main() -> int:
     c.states({t[0]: "unavailable", t[1]: "16"})
     c.check("froid : 16 °C déclenche, capteur indisponible ignoré", trigger_template(temps, "froid"), True)
 
+    # --- Fuite : alerte collante si une sonde se tait pendant la fuite ---
+    leak_tpl = next(sensor["state"] for block in PACKAGE["template"] for sensor in block.get("binary_sensor", [])
+                    if sensor.get("unique_id") == "senior_fuite_quelque_part")
+    sondes = GROUPS["senior_fuites"]
+    fuite = "binary_sensor.fuite_d_eau_quelque_part"
+
+    def leak(states, current):
+        c.states({**dict(zip(sondes, states)), fuite: current})
+        return {"this": hass.states.get(fuite)}
+
+    c.check("fuite : une sonde mouillée déclenche", leak_tpl, True, leak(["on", "off"], "off"))
+    c.check("fuite : sonde muette pendant la fuite -> alerte maintenue", leak_tpl, True,
+            leak(["unavailable", "off"], "on"))
+    c.check("fuite : sonde muette sans fuite en cours -> pas d'alerte", leak_tpl, False,
+            leak(["unavailable", "off"], "off"))
+    c.check("fuite : toutes les sondes sèches -> fin d'alerte", leak_tpl, False, leak(["off", "off"], "on"))
+
     # --- Bilan quotidien ---
     report = automation("Senior - bilan quotidien")["action"][0]["data"]["message"]
     c.states({"sensor.presence_detectee_aujourd_hui": "6.5", "sensor.ouvertures_de_la_porte_aujourd_hui": "3",
