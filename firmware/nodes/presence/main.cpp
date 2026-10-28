@@ -2,12 +2,15 @@
 // LD2410 : TX -> PIN_UART_RX, RX -> PIN_UART_TX, alim 5 V.  Relais lumière : PIN_RELAY1.
 // Broches selon la carte : lib/DomoCore/src/DomoPins.h
 // Résilience : si Home Assistant / le WiFi tombent, le mode auto continue en local.
+// Bouton mural (facultatif, conseillé) : poussoir BASSE TENSION entre PIN_INPUT1 et GND ; un appui
+// allume/éteint la lumière, même sans WiFi ni radar. Jamais l'interrupteur 230 V relié à l'ESP32.
 #include <DomoCore.h>
 #include <DomoLogic.h>
 #include <Preferences.h>
 #include <ld2410.h>
 
 #define RELAY_PIN PIN_RELAY1
+#define BTN_PIN PIN_INPUT1
 #define SEND_INTERVAL_MS 30000
 #define ABSENT_HOLD_MS 10000  // absence confirmée après 10 s sans détection (anti-clignotement)
 
@@ -16,6 +19,7 @@ ld2410 radar;
 bool radarOk = false;
 bool lightOn = false;
 domo::PresenceLight ctl;  // présence confirmée, lumière auto et forçage manuel (DomoLogic.h)
+domo::Debouncer btn(50);
 unsigned long lastSend = 0, lastRadarOk = 0, lastRetry = 0;
 bool present = false;
 bool radarFault = false;
@@ -35,6 +39,8 @@ void setup() {
   Serial.begin(115200);
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
+  pinMode(BTN_PIN, INPUT_PULLUP);  // sans bouton câblé : entrée au repos, aucun effet
+  btn.reset(digitalRead(BTN_PIN) == LOW);
   Serial1.begin(256000, SERIAL_8N1, PIN_UART_RX, PIN_UART_TX);
   radarOk = radar.begin(Serial1);
   prefs.begin("presence", false);
@@ -50,7 +56,7 @@ void setup() {
                  nullptr, "{\"entity_category\":\"diagnostic\"}");
   core.onCommand([](JsonDocument& d) {
     if (d["auto"].is<bool>()) { ctl.autoMode = d["auto"]; dirty = true; }
-    if (d["light"].is<bool>()) { ctl.force(d["light"]); setLight(d["light"]); }
+    if (d["light"].is<bool>()) { ctl.force(d["light"], millis()); setLight(d["light"]); }
     if (d["off_min"].is<float>()) {
       offMin = domo::sanitize(d["off_min"], 1, 60, offMin);
       prefs.putFloat("off_min", offMin);
@@ -62,6 +68,11 @@ void setup() {
 
 void loop() {
   core.loop();
+  // Bouton mural : bascule, comme un forçage depuis HA (respecté tant que la pièce est occupée)
+  if (btn.update(digitalRead(BTN_PIN) == LOW, millis()) && btn.state()) {
+    ctl.force(!lightOn, millis());
+    setLight(!lightOn);
+  }
   static float distance = 0;
   radar.read();
   // Radar absent au démarrage ou débranché : nouvel essai toutes les 30 s

@@ -139,7 +139,7 @@ void test_presence_eteint_apres_delai() {
 void test_forcage_respecte_tant_que_occupe() {
   PresenceLight p;
   p.update(true, 1000, HOLD, OFF);
-  p.force(false);  // "éteindre pour dormir"
+  p.force(false, 1500);  // "éteindre pour dormir"
   for (unsigned long t = 2000; t < 3600000; t += 60000) {
     p.update(true, t, HOLD, OFF);  // toujours quelqu'un dans la pièce
     TEST_ASSERT_FALSE(p.light());
@@ -148,11 +148,23 @@ void test_forcage_respecte_tant_que_occupe() {
 void test_auto_reprend_quand_piece_vide() {
   PresenceLight p;
   p.update(true, 1000, HOLD, OFF);
-  p.force(false);
+  p.force(false, 1000);
   p.update(false, 1000 + OFF + 1, HOLD, OFF);  // pièce vide depuis le délai
   TEST_ASSERT_FALSE(p.manual());
   p.update(true, 1000 + OFF + 5000, HOLD, OFF);  // quelqu'un revient
   TEST_ASSERT_TRUE(p.light());
+}
+void test_forcage_dans_piece_vide_tenu_le_delai() {
+  PresenceLight p;
+  unsigned long t0 = 10UL * 3600 * 1000;  // personne dans la pièce depuis des heures
+  p.update(false, t0, HOLD, OFF);
+  p.force(true, t0);  // allumée depuis la tablette ou le bouton mural, avant d'y aller
+  p.update(false, t0 + 10, HOLD, OFF);
+  TEST_ASSERT_TRUE(p.light());
+  p.update(false, t0 + OFF - 1, HOLD, OFF);
+  TEST_ASSERT_TRUE(p.light());
+  p.update(false, t0 + OFF + 1, HOLD, OFF);  // toujours personne après le délai : extinction auto
+  TEST_ASSERT_FALSE(p.light());
 }
 void test_mode_auto_desactive() {
   PresenceLight p;
@@ -345,6 +357,7 @@ int main() {
   RUN_TEST(test_presence_eteint_apres_delai);
   RUN_TEST(test_forcage_respecte_tant_que_occupe);
   RUN_TEST(test_auto_reprend_quand_piece_vide);
+  RUN_TEST(test_forcage_dans_piece_vide_tenu_le_delai);
   RUN_TEST(test_mode_auto_desactive);
   RUN_TEST(test_cycle_premiere_bascule_immediate);
   RUN_TEST(test_cycle_bascule_bloquee_moins_de_3_min);

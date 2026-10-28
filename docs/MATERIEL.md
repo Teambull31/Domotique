@@ -12,7 +12,7 @@ Carte conseillée selon tes cartes disponibles (DevKitC = ESP32 classique, C3, S
 | `door` | C3 (+ 100 kΩ) | contact reed NO + aimant, accu Li-ion 18650 ou LiPo + support, 2 × 100 kΩ (pont diviseur), boîtier | 5–10 € |
 | `call` | C3 (+ 100 kΩ) | gros bouton poussoir contrasté (type « champignon »), LED + 330 Ω, accu + support, 2 × 100 kΩ, boîtier à garder sur soi ou fixer près du lit | 5–10 € |
 | `leak` | C3 (+ 100 kΩ) | sonde d'eau à sortie numérique (module comparateur), accu + support, 2 × 100 kΩ | 4–8 € |
-| `presence` | S3 ou DevKitC | radar HLK-LD2410 (B ou C), module relais 1 voie 3,3 V ou relais statique | 6–12 € |
+| `presence` | S3 ou DevKitC | radar HLK-LD2410 (B ou C), module relais 1 voie 3,3 V ou relais statique ; poussoir mural basse tension conseillé | 6–15 € |
 | `shutters` | S3 ou DevKitC | module 2 relais 3,3 V à **isolation renforcée** (ou module volet du commerce à contacts secs) ; poussoir double montée/descente **basse tension** (l'inverseur 230 V ne se branche pas sur l'ESP32) | 5–15 € |
 | `gate` | DevKitC ou S3 | module relais 1 voie 3,3 V (contact sec), contact magnétique d'extérieur NO (+ un 2e facultatif), boîtier IP65 | 10–20 € |
 | `pilote` | DevKitC ou S3 | module « fil pilote » 230 V (2 optotriacs MOC3041 + diodes 1N4007, isolé) ou à monter par un électricien, BME280 facultatif (mode Auto) | 8–15 € |

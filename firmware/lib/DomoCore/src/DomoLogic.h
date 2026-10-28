@@ -63,7 +63,8 @@ private:
 // - absence confirmée après `holdMs` sans détection (le radar brut clignote) ;
 // - lumière allumée sur présence, éteinte `offDelayMs` après la dernière détection ;
 // - un forçage manuel (ex. lumière éteinte pour dormir) est respecté tant que la pièce est occupée,
-//   l'automatique reprend quand elle est vide depuis `offDelayMs`.
+//   l'automatique reprend quand elle est vide depuis `offDelayMs` ET que le forçage date d'au moins
+//   `offDelayMs` (lumière allumée depuis la tablette avant d'entrer : pas éteinte aussitôt).
 class PresenceLight {
 public:
   bool autoMode = true;
@@ -74,22 +75,23 @@ public:
       seen_ = true;
     }
     present_ = detected || (seen_ && now - last_ < holdMs);  // jamais "présent" au démarrage
-    if (manual_ && !present_ && now - last_ > offDelayMs) manual_ = false;
+    if (manual_ && !present_ && now - last_ > offDelayMs && now - forcedAt_ > offDelayMs) manual_ = false;
     if (autoMode && !manual_) {
       if (present_) light_ = true;
       else if (now - last_ > offDelayMs) light_ = false;
     }
   }
-  void force(bool on) {
+  void force(bool on, unsigned long now) {
     manual_ = true;
     light_ = on;
+    forcedAt_ = now;
   }
   bool present() const { return present_; }
   bool light() const { return light_; }
   bool manual() const { return manual_; }
 
 private:
-  unsigned long last_ = 0;
+  unsigned long last_ = 0, forcedAt_ = 0;
   bool seen_ = false, present_ = false, light_ = false, manual_ = false;
 };
 
