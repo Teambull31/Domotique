@@ -20,7 +20,7 @@ Tout est compilé et testé sur PC (logique) ; **rien n'est encore validé sur d
 - [x] `shutters` : volets roulants, position estimée au temps de course (durées réglables dans HA)
 - [ ] `shutters` v2 : fin de course par mesure du courant moteur (plus précis que le temps)
 - [x] `heating` : thermostat à contact sec (entrée thermostat chaudière / vanne), hors-gel, fenêtre ouverte
-- [ ] `heating` fil pilote : radiateurs électriques (interface opto-triac 4 ordres, par un électricien)
+- [x] `pilote` : radiateurs électriques par fil pilote (4 ordres + mode Auto par sonde ; module 230 V posé par un électricien)
 - [ ] `ir` : télécommande IR (TV, clim)
 - [ ] `plants` : humidité du sol + pompe
 

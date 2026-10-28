@@ -28,7 +28,7 @@ public:
   void loop();
 
   // Déclare une entité Home Assistant (MQTT discovery), à appeler avant begin().
-  // component : sensor | binary_sensor | switch | number | cover | climate
+  // component : sensor | binary_sensor | switch | number | select | cover | climate
   // key : clé JSON dans la télémétrie (et dans les commandes pour switch/number/cover).
   // extraJson : champs de discovery additionnels, ex. {"min":7,"max":25,"step":0.5}
   void addEntity(const char* component, const char* key, const char* name,

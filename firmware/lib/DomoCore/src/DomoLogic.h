@@ -153,6 +153,35 @@ private:
   State dir_ = OPENING, expect_ = STOPPED;
 };
 
+// Fil pilote (radiateurs électriques, norme GIFAM) : l'ordre est codé par les demi-alternances du
+// 230 V envoyées sur le fil pilote, produites par 2 optotriacs (chacun derrière une diode) :
+//   Confort = rien ; Éco = alternance complète ; Hors-gel = demi-alternance négative ;
+//   Arrêt = demi-alternance positive. Sorties coupées (panne, redémarrage) = Confort : le radiateur
+//   reprend son propre thermostat, jamais de froid.
+enum class Pilote { CONFORT, ECO, HORS_GEL, ARRET };
+
+struct PiloteSorties {
+  bool positive, negative;  // optotriac de la demi-alternance positive / négative
+};
+
+inline PiloteSorties piloteSorties(Pilote p) {
+  switch (p) {
+    case Pilote::ECO: return {true, true};
+    case Pilote::HORS_GEL: return {false, true};
+    case Pilote::ARRET: return {true, false};
+    default: return {false, false};  // CONFORT
+  }
+}
+
+// Mode Auto (régulation par une sonde dans la pièce) : Confort sous la consigne, Éco au-dessus,
+// avec hystérésis ; sonde muette -> Hors-gel (le radiateur garde sa protection antigel).
+inline Pilote piloteAuto(float temp, float consigne, float hysteresis, Pilote actuel) {
+  if (std::isnan(temp)) return Pilote::HORS_GEL;
+  if (temp < consigne - hysteresis) return Pilote::CONFORT;
+  if (temp > consigne + hysteresis) return Pilote::ECO;
+  return actuel == Pilote::CONFORT ? Pilote::CONFORT : Pilote::ECO;  // dans la bande : on garde
+}
+
 // Réglage relu en mémoire flash ou reçu de HA : borné, et valeur par défaut si NaN
 // (une consigne NaN rendrait toutes les comparaisons fausses : plus de chauffe, même hors-gel).
 inline float sanitize(float v, float lo, float hi, float def) {

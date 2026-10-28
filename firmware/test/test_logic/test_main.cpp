@@ -8,6 +8,9 @@
 using domo::thermostatWant;
 using domo::CycleGuard;
 using domo::GateLogic;
+using domo::Pilote;
+using domo::piloteAuto;
+using domo::piloteSorties;
 using domo::PresenceLight;
 using domo::WindowDetector;
 using domo::batteryPercent;
@@ -258,6 +261,24 @@ void test_portail_stop_n_attend_rien() {
   TEST_ASSERT_FALSE(g.unconfirmed(GateLogic::STOPPED, 1000 + TRAVEL + 60000));
 }
 
+// --- Fil pilote ---
+void test_pilote_ordres_vers_demi_alternances() {
+  TEST_ASSERT_FALSE(piloteSorties(Pilote::CONFORT).positive);
+  TEST_ASSERT_FALSE(piloteSorties(Pilote::CONFORT).negative);
+  TEST_ASSERT_TRUE(piloteSorties(Pilote::ECO).positive && piloteSorties(Pilote::ECO).negative);
+  TEST_ASSERT_TRUE(!piloteSorties(Pilote::HORS_GEL).positive && piloteSorties(Pilote::HORS_GEL).negative);
+  TEST_ASSERT_TRUE(piloteSorties(Pilote::ARRET).positive && !piloteSorties(Pilote::ARRET).negative);
+}
+void test_pilote_auto_regulation() {
+  TEST_ASSERT_EQUAL(Pilote::CONFORT, piloteAuto(18.0f, 19.0f, 0.3f, Pilote::ECO));
+  TEST_ASSERT_EQUAL(Pilote::ECO, piloteAuto(20.0f, 19.0f, 0.3f, Pilote::CONFORT));
+  TEST_ASSERT_EQUAL(Pilote::CONFORT, piloteAuto(19.1f, 19.0f, 0.3f, Pilote::CONFORT));  // bande : garde
+  TEST_ASSERT_EQUAL(Pilote::ECO, piloteAuto(18.9f, 19.0f, 0.3f, Pilote::ECO));
+}
+void test_pilote_auto_sonde_muette_hors_gel() {
+  TEST_ASSERT_EQUAL(Pilote::HORS_GEL, piloteAuto(NAN, 19.0f, 0.3f, Pilote::CONFORT));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -301,5 +322,8 @@ int main() {
   RUN_TEST(test_portail_fermeture_confirmee);
   RUN_TEST(test_portail_fermeture_non_confirmee);
   RUN_TEST(test_portail_stop_n_attend_rien);
+  RUN_TEST(test_pilote_ordres_vers_demi_alternances);
+  RUN_TEST(test_pilote_auto_regulation);
+  RUN_TEST(test_pilote_auto_sonde_muette_hors_gel);
   return UNITY_END();
 }

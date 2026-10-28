@@ -56,6 +56,13 @@ views:
             entity: climate.heating_salon_thermostat
             name: Chauffage
             grid_options: { columns: 12 }
+          # Radiateurs électriques (fil pilote) : un appui sur le mode voulu
+          - type: tile
+            entity: select.pilote_salon_mode
+            name: Radiateurs du salon
+            features:
+              - type: select-options
+            grid_options: { columns: 12 }
 
       - type: grid
         cards:

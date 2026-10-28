@@ -15,6 +15,7 @@ Carte conseillée selon tes cartes disponibles (DevKitC = ESP32 classique, C3, S
 | `presence` | S3 ou DevKitC | radar HLK-LD2410 (B ou C), module relais 1 voie 3,3 V ou relais statique | 6–12 € |
 | `shutters` | S3 ou DevKitC | module 2 relais 3,3 V à **isolation renforcée** (ou module volet du commerce à contacts secs) | 5–10 € |
 | `gate` | DevKitC ou S3 | module relais 1 voie 3,3 V (contact sec), contact magnétique d'extérieur NO (+ un 2e facultatif), boîtier IP65 | 10–20 € |
+| `pilote` | DevKitC ou S3 | module « fil pilote » 230 V (2 optotriacs MOC3041 + diodes 1N4007, isolé) ou à monter par un électricien, BME280 facultatif (mode Auto) | 8–15 € |
 | `heating` | DevKitC ou S3 | BME280 + relais **contact sec** vers l'entrée thermostat de la chaudière / du fil pilote | 5–10 € |
 
 ## Panneau mural (voir PANNEAU.md)

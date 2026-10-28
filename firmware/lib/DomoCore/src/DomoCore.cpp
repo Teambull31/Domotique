@@ -307,6 +307,10 @@ void DomoCore::publishDiscovery() {
       doc["command_topic"] = _tCommand;
       doc["command_template"] = "{\"" + e.key + "\": {{ value }} }";
     }
+    if (e.component == "select") {  // liste de choix : options fournies par le nœud (extraJson)
+      doc["command_topic"] = _tCommand;
+      doc["command_template"] = "{\"" + e.key + "\": \"{{ value }}\"}";
+    }
     if (e.component == "climate") {  // thermostat : topics ici, modèles (templates) fournis par le nœud
       doc.remove("state_topic");
       doc.remove("value_template");
