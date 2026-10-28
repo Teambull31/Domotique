@@ -52,6 +52,60 @@ class TestVeille(unittest.TestCase):
         self.assertFalse(v.saisi)
 
 
+class TestEcranHDMI(unittest.TestCase):
+    """Écran sans rétroéclairage pilotable : éteint en veille (la nuit par défaut), sinon allumé."""
+    NUIT = {**CONF, "VEILLE_HDMI": "nuit"}
+
+    def test_ecran_allume_ou_eteint(self):
+        self.assertTrue(veille.sortie_allumee(False, 23, self.NUIT))   # utilisé : toujours allumé
+        self.assertFalse(veille.sortie_allumee(True, 23, self.NUIT))   # veille la nuit : éteint
+        self.assertTrue(veille.sortie_allumee(True, 14, self.NUIT))    # veille le jour : allumé
+        self.assertFalse(veille.sortie_allumee(True, 14, {**CONF, "VEILLE_HDMI": "toujours"}))
+        self.assertTrue(veille.sortie_allumee(True, 23, {**CONF, "VEILLE_HDMI": "jamais"}))
+
+    def test_le_jour_ecran_allume_premier_contact_non_avale(self):
+        v = veille.Veille(CONF, 0)
+        self.assertEqual(v.tour(61, False, 14, visible=False), (15, None))  # veille, mais pas de saisie
+        self.assertFalse(v.saisi)
+        self.assertEqual(v.tour(70, True, 14, visible=False), (100, None))  # le contact agit
+        self.assertFalse(v.saisi)
+
+    def test_la_nuit_ecran_eteint_premier_contact_avale(self):
+        v = veille.Veille(CONF, 0)
+        self.assertEqual(v.tour(61, False, 23, visible=True), (3, True))
+        self.assertEqual(v.tour(70, True, 23, visible=True), (40, None))  # réveil, contact non transmis
+
+    def test_passage_a_la_nuit_puis_au_jour_en_veille(self):
+        v = veille.Veille(CONF, 0)
+        v.tour(61, False, 21, visible=False)                             # veille de jour : écran allumé
+        self.assertEqual(v.tour(100, False, 22, visible=True), (None, True))   # 22 h : éteint, saisi
+        self.assertEqual(v.tour(101, False, 22, visible=True), (None, None))
+        self.assertEqual(v.tour(200, False, 7, visible=False), (None, False))  # 7 h : rallumé, rendu
+
+    def test_pilotage_des_sorties_par_wlr_randr(self):
+        with tempfile.TemporaryDirectory() as d:
+            journal = Path(d) / "appels"
+            (Path(d) / "wlr-randr").write_text(
+                f'#!/bin/bash\necho "$WAYLAND_DISPLAY $*" >> "{journal}"\n'
+                '[[ $# -eq 0 ]] && printf \'HDMI-A-1 "Ecran"\\n  Enabled: yes\\n\'\nexit 0\n')
+            (Path(d) / "wlr-randr").chmod(0o755)
+            run = Path(d) / "run" / "1000"
+            run.mkdir(parents=True)
+            ancien = os.environ["PATH"]
+            os.environ["PATH"] = f"{d}:{ancien}"
+            try:
+                motif = str(Path(d) / "run" / "*" / "wayland-[0-9]")
+                self.assertFalse(veille.allumer_ecran(False, motif))  # kiosque pas lancé : rien
+                (run / "wayland-0").write_text("")
+                self.assertTrue(veille.allumer_ecran(False, motif))
+                self.assertTrue(veille.allumer_ecran(True, motif))
+            finally:
+                os.environ["PATH"] = ancien
+            self.assertEqual(journal.read_text().splitlines(),
+                             ["wayland-0 ", "wayland-0 --output HDMI-A-1 --off",
+                              "wayland-0 ", "wayland-0 --output HDMI-A-1 --on"])
+
+
 class TestAlerte(unittest.TestCase):
     def test_alerte_reveille_l_ecran_et_rend_le_toucher(self):
         v = veille.Veille(CONF, 0)

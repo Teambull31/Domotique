@@ -124,7 +124,8 @@ main() {
   fi
   # python3 : absent de certaines images minimales (Armbian), utilisé par la veille et l'attente de HA
   # xwayland : sans lui, Cage refuse de démarrer (écran noir), et son paquet ne le demande pas
-  apt-get install -y --no-install-recommends cage xwayland "$nav_pkg" fonts-noto-color-emoji python3
+  # wlr-randr : veille des écrans HDMI (écran éteint), voir panneau-veille
+  apt-get install -y --no-install-recommends cage xwayland wlr-randr "$nav_pkg" fonts-noto-color-emoji python3
   local nav="/usr/bin/$nav_pkg"
 
   # Utilisateur dédié, sans mot de passe ni droits d'administration
@@ -188,6 +189,8 @@ VEILLE_JOUR=15    # assez pour lire l'état de la maison de loin
 VEILLE_NUIT=3
 NUIT_DEBUT=22
 NUIT_FIN=7
+# Écran HDMI (luminosité non réglable) : éteint en veille la nuit seulement (nuit), toujours, ou jamais
+VEILLE_HDMI=nuit
 # Réveil sur alerte (facultatif) : écran éclairé tant que l'État de la maison signale un problème.
 # Jeton : profil de l'utilisateur « panneau » dans HA > Sécurité > Jetons d'accès longue durée.
 #HA_URL=http://192.168.1.10:8123

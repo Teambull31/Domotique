@@ -46,8 +46,10 @@ les cartes ARM hors Raspberry Pi) : **rendu logiciel** choisi automatiquement, s
 
 **Écran** : tactile 6-7 pouces. Préférer un écran **DSI** / à nappe (ex. écran officiel Raspberry Pi) : sa
 luminosité est pilotable, donc l'écran se tamise quand on ne s'en sert pas (quelle que soit la carte, s'il
-apparaît dans `/sys/class/backlight`). Un écran HDMI + USB tactile fonctionne partout, mais reste à pleine
-luminosité (réglage sur l'écran lui-même). Alimentation officielle de la carte, microSD 16 Go.
+apparaît dans `/sys/class/backlight`). Un écran **HDMI** + USB tactile fonctionne partout ; sa luminosité ne
+se règle pas, alors la veille l'**éteint** (la nuit par défaut ; `VEILLE_HDMI=toujours` pour l'éteindre
+aussi le jour, `jamais` pour le laisser allumé) : système Trixie requis (Raspberry Pi OS actuel, Armbian
+ou Debian Trixie), sur Bookworm il reste allumé. Alimentation officielle de la carte, microSD 16 Go.
 
 1. Installer le système du tableau ci-dessus (Raspberry Pi Imager pour un Raspberry Pi, en renseignant
    WiFi, nom d'utilisateur et SSH ; image Armbian pour une autre carte), puis régler le fuseau horaire
@@ -60,10 +62,11 @@ luminosité (réglage sur l'écran lui-même). Alimentation officielle de la car
    Au démarrage, le tableau de bord s'affiche en plein écran (Cage + Chromium, sans bureau).
    **Sans entretien** : le navigateur est relancé chaque nuit à 4 h (mémoire, nouvelle version de HA),
    et le chien de garde matériel redémarre la carte si elle se fige.
-   **Veille** (écrans à luminosité pilotable) : après 1 min sans contact, l'écran se tamise (15 % le jour,
-   3 % la nuit : l'état de la maison reste lisible de loin, jamais complètement éteint même sur un écran à
-   peu de niveaux) ; il revient au toucher, et ce premier contact **ne déclenche rien** (pas de lumière
-   allumée ni de portail ouvert en réveillant l'écran). Seuls l'écran tactile et une éventuelle souris sont
+   **Veille** : après 1 min sans contact, l'écran se tamise (15 % le jour, 3 % la nuit : l'état de la
+   maison reste lisible de loin, jamais complètement éteint même sur un écran à peu de niveaux) ; écran
+   HDMI : éteint (voir plus haut). Il revient au toucher, et ce premier contact **ne déclenche rien** (pas
+   de lumière allumée ni de portail ouvert en réveillant l'écran) ; écran resté allumé (HDMI le jour) :
+   le contact agit normalement. Seuls l'écran tactile et une éventuelle souris sont
    concernés : le bouton d'alimentation (Raspberry Pi 5, cartes ARM) reste utilisable. Délai et niveaux
    dans `/etc/default/panneau-veille`, puis `sudo systemctl restart panneau-veille`.
    **Réveil sur alerte** (conseillé) : renseigner `HA_URL` et `HA_TOKEN` (jeton longue durée de

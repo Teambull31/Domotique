@@ -21,8 +21,9 @@ Personne à appeler en cas de souci avec le système : **____________________ au
 
 ## L'écran qui baisse ou qui s'allume tout seul
 
-- **Il baisse sa lumière** quand personne ne le touche : c'est normal, il économise et ne gêne pas la
-  nuit. **Le toucher une fois le rallume**, et ce premier toucher **n'actionne rien**.
+- **Il baisse sa lumière** (ou s'éteint, la nuit, selon l'écran) quand personne ne le touche : c'est
+  normal, il économise et ne gêne pas la nuit. **Le toucher une fois le rallume**, et ce premier toucher
+  **n'actionne rien**.
 - **Il s'allume tout seul** quand quelque chose est à vérifier : lire la liste en haut. Il reste allumé
   tant que le problème n'est pas réglé.
 

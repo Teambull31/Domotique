@@ -6,6 +6,8 @@ bord (périphériques d'entrée « saisis » pendant la veille), donc pas de lum
 ouvert par erreur en réveillant l'écran. Niveaux plus bas la nuit.
 Écrans à rétroéclairage pilotable (/sys/class/backlight : DSI, dont l'écran officiel Raspberry Pi, et
 la plupart des écrans à nappe des cartes ARM, Orange Pi compris), quelle que soit la carte.
+Écran sans rétroéclairage pilotable (HDMI) : en veille, l'écran est éteint (sortie désactivée par
+wlr-randr ; Cage 0.2 et plus, Raspberry Pi OS / Debian / Armbian Trixie), la nuit seulement par défaut.
 Alerte (facultatif, HA_URL + HA_TOKEN) : tant que l'« État de la maison » n'est pas « Tout va bien »
 (fuite, portail ouvert, appel…), l'écran reste à pleine luminosité pour que le problème se voie.
 Réglages : /etc/default/panneau-veille (voir install-kiosk.sh). Lancé par le service panneau-veille.
@@ -15,6 +17,7 @@ import glob
 import json
 import os
 import select
+import subprocess
 import threading
 import time
 import urllib.request
@@ -32,6 +35,7 @@ DEFAUTS = {
     "HA_URL": "",         # ex. http://192.168.1.10:8123 (vide = pas de réveil sur alerte)
     "HA_TOKEN": "",       # jeton longue durée de l'utilisateur « panneau » (profil HA > Sécurité)
     "HA_ENTITE": "sensor.etat_de_la_maison",
+    "VEILLE_HDMI": "nuit",  # écran HDMI : éteint en veille « nuit » seulement, « toujours », ou « jamais »
 }
 
 
@@ -71,8 +75,10 @@ class Veille:
     def __init__(self, conf, maintenant):
         self.conf, self.dernier_contact, self.en_veille, self.saisi = conf, maintenant, False, False
 
-    def tour(self, maintenant, contact, heure, alerte=False):
-        """Renvoie (luminosité % ou None, saisir: True/False/None)."""
+    def tour(self, maintenant, contact, heure, alerte=False, visible=True):
+        """Renvoie (luminosité % ou None, saisir: True/False/None).
+        visible : la veille se voit-elle (écran tamisé ou éteint) ? Écran HDMI le jour en mode « nuit » :
+        non, il reste allumé ; les entrées ne sont alors pas saisies (le 1er contact agit normalement)."""
         if alerte:  # problème dans la maison : écran éclairé et utilisable tant qu'il dure
             self.dernier_contact = maintenant
             if self.en_veille:
@@ -88,8 +94,11 @@ class Veille:
             self.saisi = False  # doigt levé depuis 0,5 s : rendre la main au tableau de bord
             return None, False
         if not self.en_veille and maintenant - self.dernier_contact > self.conf["DELAI"]:
-            self.en_veille, self.saisi = True, True
-            return niveau(False, heure, self.conf), True
+            self.en_veille, self.saisi = True, visible
+            return niveau(False, heure, self.conf), (True if visible else None)
+        if self.en_veille and self.saisi != visible:  # écran HDMI éteint à la nuit / rallumé au matin
+            self.saisi = visible
+            return None, visible
         return None, None
 
 
@@ -140,6 +149,44 @@ def appliquer_luminosite(pct, motif="/sys/class/backlight/*"):
             pass
 
 
+def sortie_allumee(en_veille, heure, conf):
+    """Écran sans rétroéclairage pilotable : allumé ou éteint ? (pas d'intermédiaire possible)"""
+    if not en_veille:
+        return True
+    mode = conf["VEILLE_HDMI"]
+    if mode == "toujours":
+        return False
+    if mode == "nuit":
+        return not est_nuit(heure, conf)
+    return True  # « jamais » : toujours allumé
+
+
+def session_wayland(motif="/run/user/*/wayland-[0-9]"):
+    """Environnement pour piloter l'affichage du kiosque (Cage) ; None s'il n'est pas lancé."""
+    sockets = sorted(glob.glob(motif))
+    if not sockets:
+        return None
+    return {"XDG_RUNTIME_DIR": os.path.dirname(sockets[0]), "WAYLAND_DISPLAY": os.path.basename(sockets[0])}
+
+
+def allumer_ecran(oui, motif="/run/user/*/wayland-[0-9]"):
+    """Active ou désactive les sorties d'affichage du kiosque ; False si impossible (kiosque pas
+    encore lancé, Cage 0.1 de Bookworm sans gestion des sorties, wlr-randr absent)."""
+    session = session_wayland(motif)
+    if session is None:
+        return False
+    env = {**os.environ, **session}
+    try:
+        liste = subprocess.run(["wlr-randr"], env=env, capture_output=True, text=True, timeout=5)
+        sorties = [ligne.split()[0] for ligne in liste.stdout.splitlines() if ligne and not ligne[0].isspace()]
+        for sortie in sorties:
+            subprocess.run(["wlr-randr", "--output", sortie, "--on" if oui else "--off"], env=env,
+                           capture_output=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return liste.returncode == 0 and bool(sorties)
+
+
 POINTEURS = ("ID_INPUT_TOUCHSCREEN", "ID_INPUT_TABLET", "ID_INPUT_MOUSE", "ID_INPUT_TOUCHPAD")
 
 
@@ -185,6 +232,7 @@ def saisir(fds, oui):
 RETRO = os.environ.get("PANNEAU_RETRO", "/sys/class/backlight/*")
 ENTREES = os.environ.get("PANNEAU_ENTREES", "/dev/input/event*")
 REGLAGES = os.environ.get("PANNEAU_REGLAGES", "/etc/default/panneau-veille")
+WAYLAND = os.environ.get("PANNEAU_WAYLAND", "/run/user/*/wayland-[0-9]")
 
 
 def main():
@@ -194,6 +242,9 @@ def main():
     surveillance = Surveillance(conf)
     surveillance.start()
     appliquer_luminosite(niveau(True, time.localtime().tm_hour, conf), RETRO)
+    # Sans rétroéclairage pilotable (HDMI) : la veille éteint l'écran, réappliqué chaque minute (le
+    # kiosque relancé la nuit rallume sa sortie)
+    sans_retro = not glob.glob(RETRO)
     dernier_reglage = time.monotonic()
     while True:
         if fds:
@@ -213,14 +264,18 @@ def main():
                 fds = ouvrir_entrees(ENTREES)
                 break
         heure = time.localtime().tm_hour
-        pct, saisie = veille.tour(time.monotonic(), bool(prets), heure, surveillance.alerte)
+        visible = not sans_retro or not sortie_allumee(True, heure, conf)
+        pct, saisie = veille.tour(time.monotonic(), bool(prets), heure, surveillance.alerte, visible)
         if saisie is not None:
             saisir(fds, saisie)
         if pct is not None:
             appliquer_luminosite(pct, RETRO)
-        if time.monotonic() - dernier_reglage > 60:  # passage jour/nuit
+        reglage = time.monotonic() - dernier_reglage > 60  # passage jour/nuit
+        if reglage:
             dernier_reglage = time.monotonic()
             appliquer_luminosite(niveau(not veille.en_veille, heure, conf), RETRO)
+        if sans_retro and (pct is not None or saisie is not None or reglage):
+            allumer_ecran(sortie_allumee(veille.en_veille, heure, conf), WAYLAND)
 
 
 if __name__ == "__main__":

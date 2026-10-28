@@ -36,6 +36,7 @@ nav="$(sed -n 's/^NAVIGATEUR="\(.*\)"$/\1/p' /etc/default/panneau)"
 [[ -x "$nav" ]] || echec "navigateur absent : $nav"
 command -v cage >/dev/null || echec "cage absent"
 command -v Xwayland >/dev/null || echec "xwayland absent (Cage ne démarrerait pas)"
+command -v wlr-randr >/dev/null || echec "wlr-randr absent (pas de veille des écrans HDMI)"
 for f in /etc/systemd/system/panneau.service /etc/systemd/system/panneau-veille.service \
          /etc/systemd/system/panneau-relance.service /etc/systemd/system/panneau-relance.timer \
          /etc/systemd/system.conf.d/panneau-chien-de-garde.conf /etc/default/panneau; do
