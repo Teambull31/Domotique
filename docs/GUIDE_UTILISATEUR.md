@@ -17,7 +17,8 @@ Personne à appeler en cas de souci avec le système : **____________________ au
   L'écran indique ensuite si le portail est bien ouvert ou fermé.
 - **Radiateurs** : toucher le mode voulu. **Confort** = chauffé, **Éco** = un peu moins chaud,
   **Hors-gel** = juste de quoi ne pas geler (absence), **Auto** = la maison règle toute seule.
-- **Page « Consommation »** : l'électricité de la journée et du mois, avec le coût estimé.
+- **Page « Consommation »** : l'électricité (et l'eau, si un compteur d'eau est relié) de la journée et du
+  mois, avec le coût estimé.
 
 ## L'écran qui baisse ou qui s'allume tout seul
 
@@ -56,4 +57,9 @@ Personne à appeler en cas de souci avec le système : **____________________ au
 - **Absence de la personne** (vacances, hôpital) : couper « Alertes tranquillité actives ». Restent
   actives : fuite, porte la nuit, appel, capteurs en panne.
 - **Chaque soir à 20 h**, un bilan de la journée : s'il n'arrive pas, le système a peut-être un souci.
-- **« Capteur à vérifier »** : pile faible, capteur hors ligne ou en panne ; le message dit lequel.
+- **« Capteur à vérifier »** : pile faible, capteur hors ligne ou en panne ; le message dit lequel. Le
+  **bilan de 20 h** le rappelle chaque soir tant que ce n'est pas réglé.
+- **Compteur d'eau** (s'il est installé) : **« Eau qui coule sans arrêt »** (robinet oublié, chasse d'eau
+  qui coule : alerte fuite) et **« Fuite lente probable »** (l'eau ne s'arrête plus, même la nuit :
+  vérifier chasse d'eau et robinets, sinon appeler un plombier). Arrosage long : l'alerte est normale,
+  l'acquitter.
