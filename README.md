@@ -1,4 +1,16 @@
-# Domotique — Dashboard ESP32
+# Domotique — ESP32 + Home Assistant
+
+## Contenu du dépôt
+| Dossier | Rôle |
+|---|---|
+| [`firmware/`](firmware/README.md) | Nœuds ESP32 en C++ (PlatformIO) : climat, air, énergie, porte, fuite, présence, volets, chauffage — cartes DevKitC, C3, S3 |
+| [`homeassistant/`](homeassistant/) | Alertes « tranquillité » pour proches âgés, tableau de bord du proche aidant, tests |
+| [`docs/`](docs/) | [Feuille de route](docs/ROADMAP.md), [déploiement chez un proche/client](docs/DEPLOIEMENT.md), [fiche d'installation](docs/INSTALLATION.md), [matériel](docs/MATERIEL.md) |
+| `backend/`, `frontend/`, `mosquitto/` | Tableau de bord web autonome (sans Home Assistant), décrit ci-dessous |
+
+---
+
+# Tableau de bord web (optionnel)
 
 Dashboard web temps réel pour visualiser les données de vos ESP32 à distance.
 

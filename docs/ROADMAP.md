@@ -1,12 +1,13 @@
 # Feuille de route — appartement connecté (ESP32 / C++)
 
-Chaque ligne = un nœud dans `firmware/nodes/<nom>/` (un env PlatformIO). Cocher au fur et à mesure.
+Chaque ligne = un nœud dans `firmware/nodes/<nom>/` (3 envs PlatformIO : DevKitC, C3, S3). Cocher au fur et à mesure.
+Tout est compilé et testé sur PC (logique) ; **rien n'est encore validé sur du vrai matériel**.
 
 ## Phase 1 — Socle & mesure
-- [x] Socle `DomoCore` (WiFi, MQTT, OTA, découverte Home Assistant)
+- [x] Socle `DomoCore` (portail de configuration, MQTT, OTA, découverte HA, chien de garde, diagnostic)
 - [x] `climate` : BME280 temp/humidité/pression (une carte par pièce)
 - [x] `air` : CO₂ (SCD40) + particules (PMS5003) — salon, chambre, bureau
-- [x] `power` : suivi conso (PZEM-004T ou pince SCT-013) au tableau électrique
+- [x] `power` : suivi conso (PZEM-004T v3) au tableau électrique
 
 ## Phase 2 — Sécurité
 - [x] `door` : contacts d'ouverture portes/fenêtres (reed, deep-sleep sur pile)
@@ -15,12 +16,20 @@ Chaque ligne = un nœud dans `firmware/nodes/<nom>/` (un env PlatformIO). Cocher
 - [ ] `cam` : ESP32-CAM sonnette / entrée
 
 ## Phase 3 — Confort & automatisation
-- [x] `presence` : radar mmWave LD2410 → lumières par pièce
-- [x] `lights` (relais intégré au nœud `presence`) : rubans LED (cuisine, TV) / relais
-- [x] `shutters` : volets roulants (fin de course + courant moteur)
-- [x] `heating` : fil pilote radiateurs / vannes
+- [x] `presence` : radar mmWave LD2410 + relais de lumière automatique (forçage manuel respecté)
+- [x] `shutters` : volets roulants, position estimée au temps de course (durées réglables dans HA)
+- [ ] `shutters` v2 : fin de course par mesure du courant moteur (plus précis que le temps)
+- [x] `heating` : thermostat à contact sec (entrée thermostat chaudière / vanne), hors-gel, fenêtre ouverte
+- [ ] `heating` fil pilote : radiateurs électriques (interface opto-triac 4 ordres, par un électricien)
 - [ ] `ir` : télécommande IR (TV, clim)
 - [ ] `plants` : humidité du sol + pompe
+
+## Phase « tranquillité » (proches âgés) — `homeassistant/`
+- [x] Alertes : inactivité, porte la nuit / restée ouverte, fuite répétée jusqu'à acquittement, cuisson
+      oubliée, chaleur/froid, CO2, piles et capteurs en panne
+- [x] Tableau de bord du proche aidant, bilan quotidien du soir, script de test des alertes
+- [x] Un seul endroit à adapter par site (groupes), templates testés avec le moteur de HA
+- [ ] `call` : bouton d'appel (ESP32 sur pile) — complément, **pas** une téléassistance certifiée
 
 ## Phase 4 — Énergie
 - [ ] Délestage / heures creuses : lave-linge, chauffe-eau (relais certifiés)
@@ -28,6 +37,7 @@ Chaque ligne = un nœud dans `firmware/nodes/<nom>/` (un env PlatformIO). Cocher
 
 ## Règles
 - **230 V** : modules certifiés/isolés uniquement, tableau coupé, ou électricien pour le tableau.
-- Un nœud = un `unique_id` stable ; ne jamais changer `DEVICE_ID` après coup.
+- Identifiant d'un nœud = type + pièce (+ emplacement), saisis dans le portail : les changer crée de
+  nouvelles entités dans HA (supprimer les anciennes).
 - Aucun secret dans le code : WiFi/MQTT saisis au 1er démarrage (portail captif).
 - Déploiement chez des tiers : voir `DEPLOIEMENT.md`.
