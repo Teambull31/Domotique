@@ -32,6 +32,8 @@ Personne à appeler en cas de souci avec le système : **____________________ au
   prévenu** sur son téléphone. Il vous rappelle.
 - **Le voyant clignote vite** : le message n'est pas encore parti, le bouton réessaie tout seul. Dans le
   doute, appuyer à nouveau quelques minutes plus tard, ou téléphoner directement.
+- **Appui par erreur** : sur l'écran, toucher **« J'ai appuyé par erreur »** puis confirmer. Votre
+  proche est prévenu que ce n'était rien.
 
 > ⚠️ **Ce bouton prévient votre proche, PAS les secours.**
 > **Urgence (malaise, chute, incendie) : appeler le 15 (SAMU), le 18 (pompiers) ou le 112.**

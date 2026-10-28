@@ -226,7 +226,8 @@ alert:
       Le bouton d'appel a été pressé à
       {{ as_local(states.input_boolean.senior_appel_en_cours.last_changed).strftime('%H:%M') }}.
       Pas encore pris en compte : appeler, puis éteindre « Appel en cours ».
-    done_message: "Appel pris en compte."
+    # Neutre : l'appel peut avoir été éteint par le proche OU annulé depuis l'écran (appui par erreur)
+    done_message: "Appel à l'aide terminé (« Appel en cours » éteint)."
     notifiers: [proche_aidant]
     data: { ttl: 0, priority: high, channel: alarm_stream, push: { sound: { name: default, critical: 1, volume: 1.0 } } }
 
@@ -287,6 +288,25 @@ script:
         data:
           title: "Test des alertes envoyé"
           message: "2 notifications envoyées au proche à {{ now().strftime('%H:%M') }}. Vérifier avec lui qu'elles sont arrivées et que la 2e a sonné."
+
+  # Bouton « J'ai appuyé par erreur » de l'écran de la personne : annule l'appel ET prévient le proche
+  # (sans rappel déjà envoyé, l'alerte s'arrêterait sans message : le proche ne saurait pas pourquoi).
+  senior_appel_annule:
+    alias: "Appel à l'aide : appui par erreur"
+    icon: mdi:phone-cancel
+    sequence:
+      - condition: state
+        entity_id: input_boolean.senior_appel_en_cours
+        state: "on"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.senior_appel_en_cours
+      - service: notify.proche_aidant
+        data:
+          title: "Appel annulé depuis l'écran"
+          message: >
+            « J'ai appuyé par erreur » touché sur l'écran de la maison à {{ now().strftime('%H:%M') }}.
+            Un appel pour vérifier que tout va bien reste conseillé.
 
 automation:
   # Toujours active, même alertes coupées : quelqu'un demande de l'aide.

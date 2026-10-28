@@ -23,18 +23,32 @@ views:
         cards:
           - type: heading
             heading: La maison
-          # Appel à l'aide en cours (bouton d'appel, package senior_care) : en tête, impossible à rater
+          # Appel à l'aide en cours (bouton d'appel, package senior_care) : en tête, impossible à rater.
+          # Pour la personne : rassurer, et permettre d'annuler un appui par erreur (le proche en est
+          # prévenu). L'interrupteur « pris en compte » est sur le tableau de bord du proche.
           - type: conditional
             conditions:
               - condition: state
                 entity: input_boolean.senior_appel_en_cours
                 state: "on"
             card:
-              type: entities
-              title: "🆘 Appel à l'aide en cours"
-              entities:
-                - entity: input_boolean.senior_appel_en_cours
-                  name: Éteindre une fois l'appel pris en compte
+              type: vertical-stack
+              cards:
+                - type: markdown
+                  content: |
+                    ## 🆘 Appel à l'aide envoyé
+                    Votre proche est prévenu sur son téléphone. **Il va vous rappeler.**
+
+                    Urgence (malaise, chute, incendie) : appeler le **15**, le **18** ou le **112**.
+                - type: button
+                  name: J'ai appuyé par erreur
+                  icon: mdi:phone-cancel
+                  show_state: false
+                  tap_action:
+                    action: perform-action
+                    perform_action: script.senior_appel_annule
+                    confirmation:
+                      text: "Annuler l'appel ? Votre proche sera prévenu que c'était une erreur."
             grid_options: { columns: 12 }
           - type: tile
             entity: sensor.etat_de_la_maison

@@ -202,6 +202,12 @@ async def main() -> int:
     c.states({boutons[0]: "off"})
     c.check("appel : nom inconnu -> libellé par défaut", appel_msg, "Bouton d'appel")
     c.states({"input_boolean.senior_appel_en_cours": "on"}, ago={"input_boolean.senior_appel_en_cours": 600})
+    annule = PACKAGE["script"]["senior_appel_annule"]["sequence"]
+    c.verify("appel annulé : seulement si un appel est en cours", annule[0]["state"], "on")
+    c.verify("appel annulé : le proche est prévenu", annule[2]["service"], "notify.proche_aidant")
+    c.check("appel annulé : message avec l'heure", annule[2]["data"]["message"], "touché sur l'écran de la maison à")
+    c.check("appel annulé : la fin d'alerte ne prétend pas « pris en compte »",
+            PACKAGE["alert"]["appel"]["done_message"], "Appel à l'aide terminé")
     c.check("appel : le rappel donne l'heure de l'appui", PACKAGE["alert"]["appel"]["message"],
             dt_util.as_local(dt_util.utcnow() - timedelta(seconds=600)).strftime("%H:%M"))
 
