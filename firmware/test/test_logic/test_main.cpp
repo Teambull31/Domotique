@@ -1,6 +1,7 @@
 // Tests de la logique pure (DomoLogic.h), exécutés sur PC : pio test -e native
 #include <DomoLogic.h>
 #include <unity.h>
+#include <vector>
 
 #include <cmath>
 #include <initializer_list>
@@ -379,6 +380,90 @@ void test_eau_debit() {
   TEST_ASSERT_EQUAL_FLOAT(0.0f, domo::flowLpm(1.0f, 0, 0));                 // une seule impulsion
 }
 
+// --- écoute des détecteurs de fumée / CO (audio synthétique, 16 kHz, trames de 16 ms) ---
+struct Segment {
+  int ms;
+  float hz;  // 0 = silence
+};
+
+// Rejoue `repetitions` fois le motif (avec bruit de fond) dans le détecteur ; renvoie l'état d'alarme.
+static bool ecoute(domo::AlarmPattern& p, const std::vector<Segment>& motif, int repetitions, float amplitude,
+                   float bruit, unsigned long& t) {
+  const float rate = 16000;
+  const size_t n = 256;
+  static uint32_t graine = 12345;
+  float trame[256];
+  double phase = 0;
+  for (int r = 0; r < repetitions; r++)
+    for (const Segment& seg : motif)
+      for (int fait = 0; fait < seg.ms; fait += 16) {
+        for (size_t i = 0; i < n; i++) {
+          graine = graine * 1664525u + 1013904223u;
+          float b = ((graine >> 8) / 16777216.0f * 2 - 1) * bruit;
+          float son = seg.hz > 0 ? amplitude * (float)std::sin(phase) : 0;
+          phase += 2 * 3.14159265358979 * seg.hz / rate;
+          trame[i] = son + b;
+        }
+        p.update(domo::alarmTone(trame, n, rate, 0.02f), t);
+        t += 16;
+      }
+  return p.alarm();
+}
+
+static const std::vector<Segment> T3 = {{500, 3200}, {500, 0}, {500, 3200}, {500, 0}, {500, 3200}, {1500, 0}};
+static const std::vector<Segment> T4 = {{100, 3400}, {100, 0}, {100, 3400}, {100, 0}, {100, 3400}, {100, 0},
+                                        {100, 3400}, {5000, 0}};
+
+void test_fumee_part_d_energie_d_une_frequence() {
+  float pur[256], autre[256];
+  for (int i = 0; i < 256; i++) {
+    pur[i] = 0.5f * std::sin(2 * 3.14159265f * 3125 * i / 16000);    // 3125 Hz : pile sur une raie
+    autre[i] = 0.5f * std::sin(2 * 3.14159265f * 1000 * i / 16000);
+  }
+  TEST_ASSERT_FLOAT_WITHIN(0.05, 1.0f, domo::toneRatio(pur, 256, 3125, 16000));
+  TEST_ASSERT_TRUE(domo::toneRatio(autre, 256, 3125, 16000) < 0.05f);
+}
+void test_fumee_motif_t3_detecte() {
+  domo::AlarmPattern p;
+  unsigned long t = 0;
+  TEST_ASSERT_TRUE(ecoute(p, T3, 5, 0.3f, 0.05f, t));  // 20 s d'alarme, bruit de fond
+}
+void test_fumee_motif_co_t4_detecte() {
+  domo::AlarmPattern p;
+  unsigned long t = 0;
+  TEST_ASSERT_TRUE(ecoute(p, T4, 4, 0.3f, 0.05f, t));
+}
+void test_fumee_micro_ondes_ignore() {
+  domo::AlarmPattern p;
+  unsigned long t = 0;
+  std::vector<Segment> bips = {{300, 3100}, {300, 0}, {300, 3100}, {300, 0}, {300, 3100}, {20000, 0}};
+  TEST_ASSERT_FALSE(ecoute(p, bips, 1, 0.3f, 0.05f, t));  // 3 bips puis silence
+}
+void test_fumee_tonalite_continue_ignoree() {
+  domo::AlarmPattern p;
+  unsigned long t = 0;
+  TEST_ASSERT_FALSE(ecoute(p, {{20000, 3000}}, 1, 0.3f, 0.05f, t));
+}
+void test_fumee_bruit_et_autre_frequence_ignores() {
+  domo::AlarmPattern p;
+  unsigned long t = 0;
+  TEST_ASSERT_FALSE(ecoute(p, {{20000, 0}}, 1, 0.3f, 0.3f, t));        // bruit fort seul
+  std::vector<Segment> grave = {{500, 1000}, {500, 0}, {500, 1000}, {500, 0}, {500, 1000}, {1500, 0}};
+  TEST_ASSERT_FALSE(ecoute(p, grave, 5, 0.3f, 0.05f, t));              // même rythme, 1 kHz
+}
+void test_fumee_trop_lointaine_ignoree() {
+  domo::AlarmPattern p;
+  unsigned long t = 0;
+  TEST_ASSERT_FALSE(ecoute(p, T3, 5, 0.01f, 0.002f, t));  // sous le seuil de niveau
+}
+void test_fumee_alarme_maintenue_puis_terminee() {
+  domo::AlarmPattern p;
+  unsigned long t = 0;
+  TEST_ASSERT_TRUE(ecoute(p, T3, 5, 0.3f, 0.05f, t));
+  TEST_ASSERT_TRUE(ecoute(p, {{30000, 0}}, 1, 0.3f, 0.05f, t));   // entre deux séries : maintenue
+  TEST_ASSERT_FALSE(ecoute(p, {{60000, 0}}, 1, 0.3f, 0.05f, t));  // détecteur arrêté : fin
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_thermostat_chauffe_sous_la_bande);
@@ -437,5 +522,13 @@ int main() {
   RUN_TEST(test_eau_petite_fuite_continue);
   RUN_TEST(test_eau_fuite_lente_sans_pause_nocturne);
   RUN_TEST(test_eau_debit);
+  RUN_TEST(test_fumee_part_d_energie_d_une_frequence);
+  RUN_TEST(test_fumee_motif_t3_detecte);
+  RUN_TEST(test_fumee_motif_co_t4_detecte);
+  RUN_TEST(test_fumee_micro_ondes_ignore);
+  RUN_TEST(test_fumee_tonalite_continue_ignoree);
+  RUN_TEST(test_fumee_bruit_et_autre_frequence_ignores);
+  RUN_TEST(test_fumee_trop_lointaine_ignoree);
+  RUN_TEST(test_fumee_alarme_maintenue_puis_terminee);
   return UNITY_END();
 }

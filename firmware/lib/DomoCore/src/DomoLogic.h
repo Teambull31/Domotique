@@ -297,6 +297,92 @@ inline float flowLpm(float litresPerPulse, unsigned long intervalMs, unsigned lo
   return litresPerPulse * 60000.0f / (float)intervalMs;
 }
 
+// Écoute des détecteurs de fumée / CO (nœud « smoke ») : tonalité aiguë (~3 kHz) émise en bips répétés
+// (motif normalisé T3 pour la fumée : 3 bips de 0,5 s puis 1,5 s de pause ; T4 pour le CO : 4 bips de
+// 0,1 s puis 5 s de pause).
+
+// Puissance d'une trame à la fréquence de coefficient k = 2 cos(2 pi f / rate) (algorithme de Goertzel).
+inline float goertzelPower(const float* x, size_t n, float k) {
+  float s1 = 0, s2 = 0;
+  for (size_t i = 0; i < n; i++) {
+    float s = x[i] + k * s1 - s2;
+    s2 = s1;
+    s1 = s;
+  }
+  return s1 * s1 + s2 * s2 - k * s1 * s2;
+}
+
+inline float goertzelCoef(float freq, float rate) { return 2.0f * std::cos(2.0f * 3.14159265f * freq / rate); }
+
+// Part de l'énergie d'une trame concentrée autour de `freq` : 1 = son pur à cette fréquence, ~0 = bruit
+// ou autre fréquence.
+inline float toneRatio(const float* x, size_t n, float freq, float rate) {
+  float energy = 0;
+  for (size_t i = 0; i < n; i++) energy += x[i] * x[i];
+  if (energy <= 0) return 0;
+  return goertzelPower(x, n, goertzelCoef(freq, rate)) / (energy * (float)n / 2.0f);
+}
+
+// Tonalité d'alarme dans la trame : niveau suffisant (RMS, en pleine échelle 1.0) et énergie concentrée
+// sur une fréquence entre `fMin` et `fMax` (les détecteurs vont d'environ 2,9 à 3,6 kHz). Énergie
+// calculée une seule fois : l'ESP32-C3 n'a pas d'unité de calcul flottant.
+inline bool alarmTone(const float* x, size_t n, float rate, float minRms, float minRatio = 0.3f,
+                      float fMin = 2800, float fMax = 3700, float step = 50) {
+  float energy = 0;
+  for (size_t i = 0; i < n; i++) energy += x[i] * x[i];
+  if (n == 0 || std::sqrt(energy / (float)n) < minRms) return false;
+  float seuil = minRatio * energy * (float)n / 2.0f;
+  for (float f = fMin; f <= fMax; f += step)
+    if (goertzelPower(x, n, goertzelCoef(f, rate)) >= seuil) return true;
+  return false;
+}
+
+// Motif d'alarme : des bips (tonalité de `minOnMs` à `maxOnMs`) répétés, au moins `minBeeps` dans les
+// `windowMs` dernières ms. Un micro-ondes (3 à 5 bips puis silence) ou une tonalité continue ne
+// déclenchent pas. L'alarme est maintenue `holdMs` après la dernière détection (pas de clignotement
+// entre deux séries de bips).
+class AlarmPattern {
+public:
+  AlarmPattern(unsigned long minOnMs = 50, unsigned long maxOnMs = 1000, unsigned minBeeps = 8,
+               unsigned long windowMs = 15000, unsigned long holdMs = 60000)
+      : minOn_(minOnMs), maxOn_(maxOnMs), minBeeps_(minBeeps), window_(windowMs), hold_(holdMs) {}
+
+  bool update(bool tone, unsigned long now) {
+    if (tone && !on_) {
+      on_ = true;
+      onSince_ = now;
+    } else if (!tone && on_) {
+      on_ = false;
+      unsigned long d = now - onSince_;
+      if (d >= minOn_ && d <= maxOn_) {
+        beeps_[head_] = now;
+        head_ = (head_ + 1) % kMax;
+        if (count_ < kMax) count_++;
+      }
+    }
+    unsigned recent = 0;
+    for (unsigned i = 0; i < count_; i++)
+      if (now - beeps_[i] <= window_) recent++;
+    if (recent >= minBeeps_) {
+      alarm_ = true;
+      lastHit_ = now;
+    } else if (alarm_ && now - lastHit_ > hold_) {
+      alarm_ = false;
+    }
+    return alarm_;
+  }
+  bool alarm() const { return alarm_; }
+
+private:
+  static const unsigned kMax = 32;
+  unsigned long minOn_, maxOn_;
+  unsigned minBeeps_;
+  unsigned long window_, hold_;
+  unsigned long beeps_[kMax] = {}, onSince_ = 0, lastHit_ = 0;
+  unsigned head_ = 0, count_ = 0;
+  bool on_ = false, alarm_ = false;
+};
+
 // Pile Li-ion : % entre 3,3 V (vide) et 4,2 V (pleine), borné.
 inline float batteryPercent(float volts) {
   float p = (volts - 3.3f) / (4.2f - 3.3f) * 100.0f;

@@ -19,6 +19,9 @@
 #define PIN_LED 4           // voyant de confirmation (bouton d'appel), avec résistance 330 Ω
 #define PIN_INPUT1 3        // fin de course « fermé » (portail)
 #define PIN_INPUT2 10       // fin de course « ouvert » (portail, facultatif)
+#define PIN_I2S_BCK 7       // micro I2S INMP441 (nœud smoke) : SCK
+#define PIN_I2S_WS 6        // WS
+#define PIN_I2S_DIN 10      // SD
 
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
 // ESP32-S3-DevKitC-1 : on évite 0/3/45/46 (strapping), 19/20 (USB), 26..37 (flash/PSRAM octal),
@@ -37,6 +40,9 @@
 #define PIN_LED 4
 #define PIN_INPUT1 6
 #define PIN_INPUT2 15
+#define PIN_I2S_BCK 9
+#define PIN_I2S_WS 8
+#define PIN_I2S_DIN 18
 
 #else
 // ESP32-DevKitC (ESP32 classique, WROOM/WROVER)
@@ -54,4 +60,7 @@
 #define PIN_LED 26
 #define PIN_INPUT1 33
 #define PIN_INPUT2 32
+#define PIN_I2S_BCK 22
+#define PIN_I2S_WS 21
+#define PIN_I2S_DIN 16
 #endif
